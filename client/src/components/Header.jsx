@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 
 const Header = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true); // Default to dark mode based on your screenshots
 
   useEffect(() => {
     // Check if user prefers dark mode
@@ -14,6 +14,8 @@ const Header = () => {
 
     if (isDark) {
       document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
     }
   }, []);
 
@@ -31,15 +33,16 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
+    <header className="core-ui-header">
+      <div className="core-ui-container">
+        <div className="flex justify-between h-14 items-center">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              {/* Reduced icon size */}
+              {/* Logo icon with explicit dimensions */}
               <svg
-                className="h-6 w-6 text-blue-600 dark:text-blue-400"
-                xmlns="http://www.w3.org/2000/svg"
+                className="icons"
+                width="24"
+                height="24"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -51,47 +54,46 @@ const Header = () => {
                 <path d="M16 12h.01M8 12h.01M12 8h.01M12 16h.01" />
               </svg>
             </div>
-            <div className="ml-2">
-              <span className="text-xl font-bold text-gray-900 dark:text-white">
+            <div className="ml-3">
+              <span className="text-base font-semibold text-gray-900 dark:text-white">
                 MT940 Converter
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center space-x-3">
             <button
               onClick={toggleDarkMode}
-              className="p-1.5 rounded-full text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="p-1 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none"
               aria-label="Toggle dark mode"
             >
-              {/* Reduced icon size */}
               {isDarkMode ? (
                 <svg
-                  className="h-5 w-5"
-                  fill="none"
+                  className="icons"
+                  width="20"
+                  height="20"
                   viewBox="0 0 24 24"
+                  fill="none"
                   stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-                  />
+                  <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
               ) : (
                 <svg
-                  className="h-5 w-5"
-                  fill="none"
+                  className="icons"
+                  width="20"
+                  height="20"
                   viewBox="0 0 24 24"
+                  fill="none"
                   stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-                  />
+                  <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                 </svg>
               )}
             </button>
@@ -100,14 +102,15 @@ const Header = () => {
               href="https://github.com/elmariamikhalil/mt940-converter"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
+              className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
             >
               <span className="sr-only">GitHub</span>
-              {/* Reduced icon size */}
               <svg
-                className="h-5 w-5"
-                fill="currentColor"
+                className="icons"
+                width="20"
+                height="20"
                 viewBox="0 0 24 24"
+                fill="currentColor"
                 aria-hidden="true"
               >
                 <path

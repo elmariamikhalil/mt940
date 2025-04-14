@@ -4,9 +4,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fix for SVG icons - notice the correction from 'size' to 'width' and 'height' */
+.icons {
+  width: 20px !important;
+  height: 20px !important;
+  display: inline-block !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Ensure all SVGs have explicit dimensions */
+svg:not([width]):not([height]) {
+  width: 20px;
+  height: 20px;
+}
+
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white;
+    @apply bg-gray-50 text-gray-900 dark:bg-black dark:text-white;
     font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
       "Segoe UI", Roboto, Arial, sans-serif;
   }
@@ -19,9 +34,7 @@
   h6 {
     @apply font-medium leading-tight;
   }
-  .svg * {
-    size: 50px !important;
-  }
+
   /* Remove default focus style and add custom focus style */
   *:focus {
     @apply outline-none;
@@ -60,7 +73,7 @@
   }
 
   .btn-secondary {
-    @apply bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-blue-500;
+    @apply bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700;
   }
 
   /* Custom card styles */
@@ -71,6 +84,27 @@
   /* Custom input styles */
   .input {
     @apply block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white;
+  }
+
+  /* Core UI-style elements */
+  .core-ui-header {
+    @apply bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800;
+  }
+
+  .core-ui-container {
+    @apply w-full max-w-6xl mx-auto px-4;
+  }
+
+  .core-ui-button {
+    @apply inline-flex items-center justify-center rounded font-medium text-sm px-4 py-2 transition-colors;
+  }
+
+  .core-ui-button-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700;
+  }
+
+  .core-ui-button-secondary {
+    @apply bg-gray-600 dark:bg-gray-700 text-white hover:bg-gray-700 dark:hover:bg-gray-600;
   }
 }
 

@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { CCard, CCardBody, CCol, CRow } from "@coreui/react";
+import { FaWallet, FaMoneyBill, FaMinus, FaCalculator } from "react-icons/fa";
 
 const DashboardStats = ({ transactions }) => {
   const stats = useMemo(() => {
@@ -10,15 +12,11 @@ const DashboardStats = ({ transactions }) => {
         netBalance: 0,
       };
     }
-
     let totalIncome = 0;
     let totalExpenses = 0;
-
     transactions.forEach((tx) => {
-      // First check if amount is a string or number and convert properly
       let amount;
       if (typeof tx.amount === "string") {
-        // Remove currency symbols and commas to convert to a number
         amount = parseFloat(tx.amount.replace(/[^0-9.-]+/g, ""));
       } else if (typeof tx.amount === "number") {
         amount = tx.amount;
@@ -30,20 +28,16 @@ const DashboardStats = ({ transactions }) => {
         );
         amount = 0;
       }
-
-      // Check for NaN
       if (isNaN(amount)) {
         console.warn("Could not parse transaction amount:", tx.amount);
         amount = 0;
       }
-
       if (amount > 0) {
         totalIncome += amount;
       } else {
         totalExpenses += Math.abs(amount);
       }
     });
-
     return {
       totalTransactions: transactions.length,
       totalIncome: totalIncome.toFixed(2),
@@ -52,9 +46,7 @@ const DashboardStats = ({ transactions }) => {
     };
   }, [transactions]);
 
-  // Format currency with the appropriate symbol
   const formatCurrency = (value) => {
-    // You can customize this based on the currency in your data
     return `€${parseFloat(value).toLocaleString("en-US", {
       minimumFractionDigits: 2,
     })}`;
@@ -62,161 +54,82 @@ const DashboardStats = ({ transactions }) => {
 
   return (
     <div className="mb-4">
-      <h2 className="text-base font-semibold text-gray-800 dark:text-white mb-2">
-        Transaction Summary
-      </h2>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <h2 className="text-base font-semibold mb-3">Transaction Summary</h2>
+      <CRow className="g-3">
         {/* Total Transactions */}
-        <div className="bg-white dark:bg-gray-700 overflow-hidden shadow rounded">
-          <div className="px-3 py-2">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-blue-100 dark:bg-blue-800 rounded p-1.5">
-                <svg
-                  className="h-4 w-4 text-blue-600 dark:text-blue-200"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                  />
-                </svg>
+        <CCol xs={6} md={3}>
+          <CCard className="h-100">
+            <CCardBody className="d-flex align-items-center">
+              <div className="me-3 p-2 bg-primary bg-opacity-25 rounded">
+                <FaWallet size={20} className="text-primary" />
               </div>
-              <div className="ml-3 w-0 flex-1">
-                <dl>
-                  <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">
-                    Transactions
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {stats.totalTransactions}
-                    </div>
-                  </dd>
-                </dl>
+              <div>
+                <div className="text-sm text-muted">Transactions</div>
+                <div className="text-lg font-weight-bold">
+                  {stats.totalTransactions}
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
+            </CCardBody>
+          </CCard>
+        </CCol>
 
         {/* Total Income */}
-        <div className="bg-white dark:bg-gray-700 overflow-hidden shadow rounded">
-          <div className="px-3 py-2">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-green-100 dark:bg-green-800 rounded p-1.5">
-                <svg
-                  className="h-4 w-4 text-green-600 dark:text-green-200"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  />
-                </svg>
+        <CCol xs={6} md={3}>
+          <CCard className="h-100">
+            <CCardBody className="d-flex align-items-center">
+              <div className="me-3 p-2 bg-success bg-opacity-25 rounded">
+                <CIcon icon={cilMoney} size="lg" className="text-success" />
               </div>
-              <div className="ml-3 w-0 flex-1">
-                <dl>
-                  <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">
-                    Income
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {formatCurrency(stats.totalIncome)}
-                    </div>
-                  </dd>
-                </dl>
+              <div>
+                <div className="text-sm text-muted">Income</div>
+                <div className="text-lg font-weight-bold">
+                  {formatCurrency(stats.totalIncome)}
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
+            </CCardBody>
+          </CCard>
+        </CCol>
 
         {/* Total Expenses */}
-        <div className="bg-white dark:bg-gray-700 overflow-hidden shadow rounded">
-          <div className="px-3 py-2">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-red-100 dark:bg-red-800 rounded p-1.5">
-                <svg
-                  className="h-4 w-4 text-red-600 dark:text-red-200"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M18 12H6"
-                  />
-                </svg>
+        <CCol xs={6} md={3}>
+          <CCard className="h-100">
+            <CCardBody className="d-flex align-items-center">
+              <div className="me-3 p-2 bg-danger bg-opacity-25 rounded">
+                <CIcon icon={cilMinus} size="lg" className="text-danger" />
               </div>
-              <div className="ml-3 w-0 flex-1">
-                <dl>
-                  <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">
-                    Expenses
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {formatCurrency(stats.totalExpenses)}
-                    </div>
-                  </dd>
-                </dl>
+              <div>
+                <div className="text-sm text-muted">Expenses</div>
+                <div className="text-lg font-weight-bold">
+                  {formatCurrency(stats.totalExpenses)}
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
+            </CCardBody>
+          </CCard>
+        </CCol>
 
         {/* Net Balance */}
-        <div className="bg-white dark:bg-gray-700 overflow-hidden shadow rounded">
-          <div className="px-3 py-2">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-purple-100 dark:bg-purple-800 rounded p-1.5">
-                <svg
-                  className="h-4 w-4 text-purple-600 dark:text-purple-200"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+        <CCol xs={6} md={3}>
+          <CCard className="h-100">
+            <CCardBody className="d-flex align-items-center">
+              <div className="me-3 p-2 bg-purple bg-opacity-25 rounded">
+                <CIcon icon={cilCalculator} size="lg" className="text-purple" />
+              </div>
+              <div>
+                <div className="text-sm text-muted">Balance</div>
+                <div
+                  className={`text-lg font-weight-bold ${
+                    parseFloat(stats.netBalance) >= 0
+                      ? "text-success"
+                      : "text-danger"
+                  }`}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
+                  {formatCurrency(stats.netBalance)}
+                </div>
               </div>
-              <div className="ml-3 w-0 flex-1">
-                <dl>
-                  <dt className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">
-                    Balance
-                  </dt>
-                  <dd className="flex items-baseline">
-                    <div
-                      className={`text-sm font-semibold ${
-                        parseFloat(stats.netBalance) >= 0
-                          ? "text-green-600 dark:text-green-400"
-                          : "text-red-600 dark:text-red-400"
-                      }`}
-                    >
-                      {formatCurrency(stats.netBalance)}
-                    </div>
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            </CCardBody>
+          </CCard>
+        </CCol>
+      </CRow>
     </div>
   );
 };
