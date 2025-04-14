@@ -258,11 +258,11 @@ exports.downloadExcel = async (req, res) => {
   });
 
   // Set the file path
-  const filePath = path.join(__dirname, "..", "uploads", "transactions.xlsx");
+  const filePath = path.join(__dirname, "..", "uploads", "statement.xlsx");
   await workbook.xlsx.writeFile(filePath);
 
   // Download the file
-  res.download(filePath, "transactions.xlsx", (err) => {
+  res.download(filePath, "statement.xlsx", (err) => {
     if (err) {
       console.error("Error during file download:", err);
       res.status(500).json({ error: "Error downloading the file" });
