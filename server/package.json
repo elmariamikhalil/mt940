@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "cors": "^2.8.5",
+    "csv-writer": "^1.6.0",
+    "exceljs": "^4.4.0",
+    "express": "^5.1.0",
+    "json2csv": "^6.0.0-alpha.2",
+    "mt940-js": "^1.0.0",
+    "multer": "^1.4.5-lts.2",
+    "node-cron": "^3.0.3",
+    "tslib": "^2.8.1"
+  }
+}
