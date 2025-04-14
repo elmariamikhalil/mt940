@@ -22,8 +22,8 @@ app.use("/api", routes);
 
 // SSL Certificate paths
 const options = {
-  key: fs.readFileSync("/path/to/your/private.key"), // Replace with your SSL key path
-  cert: fs.readFileSync("/path/to/your/certificate.crt"), // Replace with your SSL cert path
+  key: fs.readFileSync("/etc/ssl/private/ssl-cert-snakeoil.key"), // Replace with your SSL key path
+  cert: fs.readFileSync("/etc/ssl/certs/ca-certificates.crt"), // Replace with your SSL cert path
 };
 
 // Use https.createServer instead of app.listen to serve over HTTPS
