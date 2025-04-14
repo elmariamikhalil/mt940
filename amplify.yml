@@ -4,12 +4,12 @@ frontend:
     preBuild:
       commands:
         - cd client
-        - npm install
+        - npm ci
     build:
       commands:
         - npm run build
   artifacts:
-    baseDirectory: client/build
+    baseDirectory: client/dist
     files:
       - "**/*"
   cache:
