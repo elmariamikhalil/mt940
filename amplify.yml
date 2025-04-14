@@ -4,7 +4,7 @@ frontend:
     preBuild:
       commands:
         - cd client
-        - npm install
+        - npm ci
     build:
       commands:
         - npm run build
@@ -14,13 +14,5 @@ frontend:
       - "**/*"
   cache:
     paths:
-      - client/node_modules/**
-
-# 👇 Add backend section (Node.js/Express)
-backend:
-  phases:
-    build:
-      commands:
-        - cd server
-        - npm install
-        - nohup node server.js & # or replace index.js with your main entry
+      - node_modules/**/*
+      - client/node_modules/**/*
