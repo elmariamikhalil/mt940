@@ -7,7 +7,7 @@ function App() {
   const [transactions, setTransactions] = useState([]);
 
   const downloadFile = (type) => {
-    window.location.href = `http://localhost:5000/api/download/${type}`;
+    window.location.href = `https://13.39.246.230:5000/api/download/${type}`;
   };
 
   return (
