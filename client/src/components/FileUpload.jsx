@@ -6,6 +6,7 @@ import {
   CFormInput,
   CAlert,
   CSpinner,
+  CBadge,
 } from "@coreui/react";
 import apiService from "../api";
 
@@ -70,17 +71,21 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
           onDragOver={handleDrag}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current.click()}
-          className={`border rounded p-5 text-center cursor-pointer ${
+          className={`border rounded p-5 text-center ${
             dragActive ? "border-primary bg-light" : "border-secondary"
           }`}
-          style={{ borderStyle: "dashed", transition: "0.3s" }}
+          style={{
+            borderStyle: "dashed",
+            transition: "0.3s",
+            cursor: "pointer",
+          }}
         >
-          <input
+          <CFormInput
             ref={fileInputRef}
             type="file"
             accept=".mt940,.sta"
             onChange={handleFileChange}
-            className="d-none"
+            style={{ display: "none" }}
           />
 
           <div className="d-flex flex-column align-items-center">
@@ -101,7 +106,7 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
             <h5 className="fw-semibold">
               {file ? file.name : "Drag & drop or click to select file"}
             </h5>
-            <p className="text-muted small">
+            <p className="text-medium-emphasis small">
               {file
                 ? `${(file.size / 1024).toFixed(2)} KB`
                 : "Supported: .mt940, .sta"}
@@ -133,18 +138,20 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
         </div>
 
         <div className="mt-4 text-center">
-          <small className="text-muted fw-semibold">
+          <small className="text-medium-emphasis fw-semibold">
             Supported Bank Formats:
           </small>
           <div className="d-flex justify-content-center flex-wrap gap-2 mt-2">
             {["SWIFT MT940", "SEPA", "Rabobank", "ABN AMRO", "ING"].map(
               (bank) => (
-                <span
+                <CBadge
                   key={bank}
-                  className="badge text-bg-secondary rounded-pill px-3"
+                  color="secondary"
+                  shape="rounded-pill"
+                  className="px-3"
                 >
                   {bank}
-                </span>
+                </CBadge>
               )
             )}
           </div>

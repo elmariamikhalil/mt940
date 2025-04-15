@@ -1,7 +1,18 @@
 import { useState, useEffect } from "react";
+import {
+  CHeader,
+  CContainer,
+  CHeaderBrand,
+  CHeaderNav,
+  CHeaderNavItem,
+  CHeaderNavLink,
+  CButton,
+} from "@coreui/react";
+import CIcon from "@coreui/icons-react";
+import { cilMoon, cilSun } from "@coreui/icons";
 
 const Header = () => {
-  const [isDarkMode, setIsDarkMode] = useState(true); // Default to dark mode based on your screenshots
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
     // Check if user prefers dark mode
@@ -13,9 +24,9 @@ const Header = () => {
     setIsDarkMode(isDark);
 
     if (isDark) {
-      document.documentElement.classList.add("dark");
+      document.documentElement.classList.add("dark-theme");
     } else {
-      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.remove("dark-theme");
     }
   }, []);
 
@@ -24,89 +35,54 @@ const Header = () => {
     setIsDarkMode(newDarkMode);
 
     if (newDarkMode) {
-      document.documentElement.classList.add("dark");
+      document.documentElement.classList.add("dark-theme");
       localStorage.setItem("darkMode", "true");
     } else {
-      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.remove("dark-theme");
       localStorage.setItem("darkMode", "false");
     }
   };
 
   return (
-    <header className="core-ui-header">
-      <div className="core-ui-container">
-        <div className="flex justify-between h-14 items-center">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              {/* Logo icon with explicit dimensions */}
-              <svg
-                className="icons"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3" />
-                <path d="M16 12h.01M8 12h.01M12 8h.01M12 16h.01" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <span className="text-base font-semibold text-gray-900 dark:text-white">
-                MT940 Converter
-              </span>
-            </div>
-          </div>
+    <CHeader position="sticky" className="mb-0 border-bottom">
+      <CContainer fluid>
+        <CHeaderBrand className="d-flex align-items-center">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="me-2"
+          >
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3" />
+            <path d="M16 12h.01M8 12h.01M12 8h.01M12 16h.01" />
+          </svg>
+          <span className="fs-5 fw-semibold">MT940 Converter</span>
+        </CHeaderBrand>
 
-          <div className="flex items-center space-x-3">
-            <button
+        <CHeaderNav className="ms-auto d-flex align-items-center">
+          <CHeaderNavItem>
+            <CButton
+              color="light"
+              shape="rounded-pill"
+              size="sm"
               onClick={toggleDarkMode}
-              className="p-1 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none"
-              aria-label="Toggle dark mode"
+              className="me-2"
             >
-              {isDarkMode ? (
-                <svg
-                  className="icons"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              ) : (
-                <svg
-                  className="icons"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-              )}
-            </button>
-
-            <a
+              <CIcon icon={isDarkMode ? cilSun : cilMoon} size="sm" />
+            </CButton>
+          </CHeaderNavItem>
+          <CHeaderNavItem>
+            <CHeaderNavLink
               href="https://github.com/elmariamikhalil/mt940-converter"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
             >
-              <span className="sr-only">GitHub</span>
               <svg
-                className="icons"
                 width="20"
                 height="20"
                 viewBox="0 0 24 24"
@@ -119,11 +95,11 @@ const Header = () => {
                   clipRule="evenodd"
                 />
               </svg>
-            </a>
-          </div>
-        </div>
-      </div>
-    </header>
+            </CHeaderNavLink>
+          </CHeaderNavItem>
+        </CHeaderNav>
+      </CContainer>
+    </CHeader>
   );
 };
 

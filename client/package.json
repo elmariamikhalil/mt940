@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@coreui/coreui": "^5.2.0",
+    "@coreui/icons": "^3.0.1",
+    "@coreui/icons-react": "^2.3.0",
     "@coreui/react": "^5.5.0",
     "@tailwindcss/cli": "^4.1.3",
     "axios": "^1.8.4",

@@ -17,6 +17,8 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import DashboardStats from "./components/DashboardStats";
 import apiService from "./api";
+import "@coreui/coreui/dist/css/coreui.min.css";
+import "./App.css";
 
 function App() {
   const [transactions, setTransactions] = useState([]);
@@ -42,12 +44,13 @@ function App() {
       <Header />
 
       <CContainer className="flex-grow-1 py-4">
-        <CCard>
-          <CNav variant="tabs" role="tablist">
+        <CCard className="shadow">
+          <CNav variant="tabs" className="mt-1 mx-1">
             <CNavItem>
               <CNavLink
                 active={activeTab === "upload"}
                 onClick={() => setActiveTab("upload")}
+                className="cursor-pointer"
               >
                 Upload
               </CNavLink>
@@ -57,6 +60,7 @@ function App() {
                 active={activeTab === "results"}
                 onClick={() => setActiveTab("results")}
                 disabled={transactions.length === 0}
+                className="cursor-pointer"
               >
                 Results
               </CNavLink>
@@ -68,7 +72,7 @@ function App() {
               <>
                 <div className="text-center mb-4">
                   <h2>MT940 File Converter</h2>
-                  <p className="text-muted">
+                  <p className="text-medium-emphasis">
                     Upload your MT940 file and convert it to CSV or Excel
                     format.
                   </p>
@@ -86,7 +90,7 @@ function App() {
                     <DashboardStats transactions={transactions} />
                     <TransactionsTable transactions={transactions} />
 
-                    <CRow className="mt-4 text-center justify-content-center">
+                    <CRow className="mt-4 text-center justify-content-center g-3">
                       <CCol xs="auto">
                         <CButton
                           color="success"

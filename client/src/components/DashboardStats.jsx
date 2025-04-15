@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { CCard, CCardBody, CCol, CRow } from "@coreui/react";
-import { FaWallet, FaMoneyBill, FaMinus, FaCalculator } from "react-icons/fa";
+import CIcon from "@coreui/icons-react";
+import { cilWallet, cilMoney, cilMinus, cilCalculator } from "@coreui/icons";
 
 const DashboardStats = ({ transactions }) => {
   const stats = useMemo(() => {
@@ -54,20 +55,18 @@ const DashboardStats = ({ transactions }) => {
 
   return (
     <div className="mb-4">
-      <h2 className="text-base font-semibold mb-3">Transaction Summary</h2>
+      <h4 className="mb-3">Transaction Summary</h4>
       <CRow className="g-3">
         {/* Total Transactions */}
         <CCol xs={6} md={3}>
           <CCard className="h-100">
             <CCardBody className="d-flex align-items-center">
               <div className="me-3 p-2 bg-primary bg-opacity-25 rounded">
-                <FaWallet size={20} className="text-primary" />
+                <CIcon icon={cilWallet} size="xl" className="text-primary" />
               </div>
               <div>
-                <div className="text-sm text-muted">Transactions</div>
-                <div className="text-lg font-weight-bold">
-                  {stats.totalTransactions}
-                </div>
+                <div className="text-sm text-medium-emphasis">Transactions</div>
+                <div className="fs-5 fw-bold">{stats.totalTransactions}</div>
               </div>
             </CCardBody>
           </CCard>
@@ -78,11 +77,11 @@ const DashboardStats = ({ transactions }) => {
           <CCard className="h-100">
             <CCardBody className="d-flex align-items-center">
               <div className="me-3 p-2 bg-success bg-opacity-25 rounded">
-                <CIcon icon={cilMoney} size="lg" className="text-success" />
+                <CIcon icon={cilMoney} size="xl" className="text-success" />
               </div>
               <div>
-                <div className="text-sm text-muted">Income</div>
-                <div className="text-lg font-weight-bold">
+                <div className="text-sm text-medium-emphasis">Income</div>
+                <div className="fs-5 fw-bold">
                   {formatCurrency(stats.totalIncome)}
                 </div>
               </div>
@@ -95,11 +94,11 @@ const DashboardStats = ({ transactions }) => {
           <CCard className="h-100">
             <CCardBody className="d-flex align-items-center">
               <div className="me-3 p-2 bg-danger bg-opacity-25 rounded">
-                <CIcon icon={cilMinus} size="lg" className="text-danger" />
+                <CIcon icon={cilMinus} size="xl" className="text-danger" />
               </div>
               <div>
-                <div className="text-sm text-muted">Expenses</div>
-                <div className="text-lg font-weight-bold">
+                <div className="text-sm text-medium-emphasis">Expenses</div>
+                <div className="fs-5 fw-bold">
                   {formatCurrency(stats.totalExpenses)}
                 </div>
               </div>
@@ -111,13 +110,13 @@ const DashboardStats = ({ transactions }) => {
         <CCol xs={6} md={3}>
           <CCard className="h-100">
             <CCardBody className="d-flex align-items-center">
-              <div className="me-3 p-2 bg-purple bg-opacity-25 rounded">
-                <CIcon icon={cilCalculator} size="lg" className="text-purple" />
+              <div className="me-3 p-2 bg-info bg-opacity-25 rounded">
+                <CIcon icon={cilCalculator} size="xl" className="text-info" />
               </div>
               <div>
-                <div className="text-sm text-muted">Balance</div>
+                <div className="text-sm text-medium-emphasis">Balance</div>
                 <div
-                  className={`text-lg font-weight-bold ${
+                  className={`fs-5 fw-bold ${
                     parseFloat(stats.netBalance) >= 0
                       ? "text-success"
                       : "text-danger"
