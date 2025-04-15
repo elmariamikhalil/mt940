@@ -54,14 +54,14 @@ const DashboardStats = ({ transactions }) => {
   };
 
   return (
-    <div className="mb-4">
+    <div className="dashboard-stats mb-4">
       <h4 className="mb-3">Transaction Summary</h4>
       <CRow className="g-3">
         {/* Total Transactions */}
         <CCol xs={6} md={3}>
-          <CCard className="h-100">
+          <CCard className="h-100 stat-card">
             <CCardBody className="d-flex align-items-center">
-              <div className="me-3 p-2 bg-primary bg-opacity-25 rounded">
+              <div className="me-3 p-2 bg-primary bg-opacity-25 rounded icon-wrapper">
                 <CIcon icon={cilWallet} size="xl" className="text-primary" />
               </div>
               <div>
@@ -71,12 +71,11 @@ const DashboardStats = ({ transactions }) => {
             </CCardBody>
           </CCard>
         </CCol>
-
         {/* Total Income */}
         <CCol xs={6} md={3}>
-          <CCard className="h-100">
+          <CCard className="h-100 stat-card">
             <CCardBody className="d-flex align-items-center">
-              <div className="me-3 p-2 bg-success bg-opacity-25 rounded">
+              <div className="me-3 p-2 bg-success bg-opacity-25 rounded icon-wrapper">
                 <CIcon icon={cilMoney} size="xl" className="text-success" />
               </div>
               <div>
@@ -88,12 +87,11 @@ const DashboardStats = ({ transactions }) => {
             </CCardBody>
           </CCard>
         </CCol>
-
         {/* Total Expenses */}
         <CCol xs={6} md={3}>
-          <CCard className="h-100">
+          <CCard className="h-100 stat-card">
             <CCardBody className="d-flex align-items-center">
-              <div className="me-3 p-2 bg-danger bg-opacity-25 rounded">
+              <div className="me-3 p-2 bg-danger bg-opacity-25 rounded icon-wrapper">
                 <CIcon icon={cilMinus} size="xl" className="text-danger" />
               </div>
               <div>
@@ -105,12 +103,11 @@ const DashboardStats = ({ transactions }) => {
             </CCardBody>
           </CCard>
         </CCol>
-
         {/* Net Balance */}
         <CCol xs={6} md={3}>
-          <CCard className="h-100">
+          <CCard className="h-100 stat-card">
             <CCardBody className="d-flex align-items-center">
-              <div className="me-3 p-2 bg-info bg-opacity-25 rounded">
+              <div className="me-3 p-2 bg-info bg-opacity-25 rounded icon-wrapper">
                 <CIcon icon={cilCalculator} size="xl" className="text-info" />
               </div>
               <div>

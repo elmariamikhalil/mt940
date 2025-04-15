@@ -28,14 +28,11 @@ const TransactionsTable = ({ transactions }) => {
   // Sort transactions
   const sortedTransactions = useMemo(() => {
     if (!transactions) return [];
-
     const sortableItems = [...transactions];
-
     sortableItems.sort((a, b) => {
       if (sortConfig.key === "amount") {
         // Handle various amount formats safely
         let amountA, amountB;
-
         if (typeof a.amount === "string") {
           amountA = parseFloat(a.amount.replace(/[^0-9.-]+/g, ""));
         } else if (typeof a.amount === "number") {
@@ -43,7 +40,6 @@ const TransactionsTable = ({ transactions }) => {
         } else {
           amountA = 0;
         }
-
         if (typeof b.amount === "string") {
           amountB = parseFloat(b.amount.replace(/[^0-9.-]+/g, ""));
         } else if (typeof b.amount === "number") {
@@ -51,11 +47,9 @@ const TransactionsTable = ({ transactions }) => {
         } else {
           amountB = 0;
         }
-
         // Check for NaN
         if (isNaN(amountA)) amountA = 0;
         if (isNaN(amountB)) amountB = 0;
-
         if (amountA < amountB) {
           return sortConfig.direction === "asc" ? -1 : 1;
         }
@@ -67,7 +61,6 @@ const TransactionsTable = ({ transactions }) => {
         // Sort other columns as strings
         const valA = String(a[sortConfig.key] || "");
         const valB = String(b[sortConfig.key] || "");
-
         if (valA < valB) {
           return sortConfig.direction === "asc" ? -1 : 1;
         }
@@ -77,14 +70,12 @@ const TransactionsTable = ({ transactions }) => {
         return 0;
       }
     });
-
     return sortableItems;
   }, [transactions, sortConfig]);
 
   // Filter transactions based on search term
   const filteredTransactions = useMemo(() => {
     if (!searchTerm) return sortedTransactions;
-
     return sortedTransactions.filter((transaction) => {
       const searchLower = searchTerm.toLowerCase();
       const descriptionStr = String(
@@ -92,7 +83,6 @@ const TransactionsTable = ({ transactions }) => {
       ).toLowerCase();
       const dateStr = String(transaction.date || "").toLowerCase();
       const amountStr = String(transaction.amount || "").toLowerCase();
-
       return (
         descriptionStr.includes(searchLower) ||
         dateStr.includes(searchLower) ||
@@ -111,17 +101,14 @@ const TransactionsTable = ({ transactions }) => {
 
   const requestSort = (key) => {
     let direction = "asc";
-
     if (sortConfig.key === key && sortConfig.direction === "asc") {
       direction = "desc";
     }
-
     setSortConfig({ key, direction });
   };
 
   const getSortIcon = (key) => {
     if (sortConfig.key !== key) return null;
-
     return sortConfig.direction === "asc" ? (
       <CIcon icon={cilArrowTop} size="sm" />
     ) : (
@@ -142,14 +129,14 @@ const TransactionsTable = ({ transactions }) => {
   if (!transactions || transactions.length === 0) return null;
 
   return (
-    <CCard className="mb-4">
-      <CCardHeader className="d-flex justify-content-between align-items-center py-2">
-        <h5 className="mb-0">Transaction List</h5>
-        <div className="position-relative">
+    <CCard className="transactions-card mb-4">
+      <CCardHeader className="transactions-card-header d-flex justify-content-between align-items-center py-2">
+        <h5 className="mb-0 transactions-title">Transaction List</h5>
+        <div className="transactions-search-wrapper position-relative">
           <CIcon
             icon={cilSearch}
             size="sm"
-            className="position-absolute text-medium-emphasis"
+            className="position-absolute text-medium-emphasis transactions-search-icon"
             style={{ left: "10px", top: "50%", transform: "translateY(-50%)" }}
           />
           <CFormInput
@@ -160,19 +147,19 @@ const TransactionsTable = ({ transactions }) => {
               setSearchTerm(e.target.value);
               setCurrentPage(1); // Reset to first page when searching
             }}
-            className="ps-4"
+            className="transactions-search-input ps-4"
             style={{ width: "250px" }}
           />
         </div>
       </CCardHeader>
-      <CCardBody className="p-0">
-        <div className="table-responsive">
-          <CTable hover className="mb-0">
+      <CCardBody className="transactions-card-body p-0">
+        <div className="table-responsive transactions-table-wrapper">
+          <CTable hover className="transactions-table mb-0">
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell
                   scope="col"
-                  className="cursor-pointer"
+                  className="transactions-header-cell cursor-pointer"
                   onClick={() => requestSort("date")}
                 >
                   <div className="d-flex align-items-center">
@@ -181,7 +168,7 @@ const TransactionsTable = ({ transactions }) => {
                 </CTableHeaderCell>
                 <CTableHeaderCell
                   scope="col"
-                  className="cursor-pointer"
+                  className="transactions-header-cell cursor-pointer"
                   onClick={() => requestSort("amount")}
                 >
                   <div className="d-flex align-items-center">
@@ -190,7 +177,7 @@ const TransactionsTable = ({ transactions }) => {
                 </CTableHeaderCell>
                 <CTableHeaderCell
                   scope="col"
-                  className="cursor-pointer"
+                  className="transactions-header-cell cursor-pointer"
                   onClick={() => requestSort("description")}
                 >
                   <div className="d-flex align-items-center">
@@ -204,7 +191,7 @@ const TransactionsTable = ({ transactions }) => {
                 <CTableRow key={idx}>
                   <CTableDataCell>{tx.date}</CTableDataCell>
                   <CTableDataCell
-                    className={`fw-semibold ${
+                    className={`fw-semibold transactions-amount-cell ${
                       isNegativeAmount(tx.amount)
                         ? "text-danger"
                         : "text-success"
@@ -213,7 +200,7 @@ const TransactionsTable = ({ transactions }) => {
                     {tx.amount}
                   </CTableDataCell>
                   <CTableDataCell
-                    className="text-truncate"
+                    className="text-truncate transactions-description-cell"
                     style={{ maxWidth: "300px" }}
                   >
                     {tx.description}
@@ -223,14 +210,17 @@ const TransactionsTable = ({ transactions }) => {
             </CTableBody>
           </CTable>
         </div>
-
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="d-flex justify-content-between align-items-center p-3 border-top">
-            <div className="small text-medium-emphasis">
+          <div className="transactions-pagination-wrapper d-flex justify-content-between align-items-center p-3 border-top">
+            <div className="transactions-pagination-info small text-medium-emphasis">
               Page {currentPage} of {totalPages}
             </div>
-            <CPagination align="end" size="sm">
+            <CPagination
+              align="end"
+              size="sm"
+              className="transactions-pagination"
+            >
               <CPaginationItem
                 aria-label="Previous"
                 disabled={currentPage === 1}
@@ -238,10 +228,8 @@ const TransactionsTable = ({ transactions }) => {
               >
                 <span aria-hidden="true">&laquo;</span>
               </CPaginationItem>
-
               {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
                 let pageNum;
-
                 if (totalPages <= 3) {
                   pageNum = i + 1;
                 } else if (currentPage <= 2) {
@@ -251,7 +239,6 @@ const TransactionsTable = ({ transactions }) => {
                 } else {
                   pageNum = currentPage - 1 + i;
                 }
-
                 if (pageNum <= totalPages) {
                   return (
                     <CPaginationItem
@@ -265,7 +252,6 @@ const TransactionsTable = ({ transactions }) => {
                 }
                 return null;
               })}
-
               <CPaginationItem
                 aria-label="Next"
                 disabled={currentPage === totalPages}

@@ -9,7 +9,6 @@ import {
   CButton,
   CRow,
   CCol,
-  CSpinner,
 } from "@coreui/react";
 import FileUpload from "./components/FileUpload";
 import TransactionsTable from "./components/TransactionsTable";
@@ -40,12 +39,11 @@ function App() {
   };
 
   return (
-    <div className="min-vh-100 d-flex flex-column bg-light">
+    <div className="app-container min-vh-100 d-flex flex-column">
       <Header />
-
-      <CContainer className="flex-grow-1 py-4">
-        <CCard className="shadow">
-          <CNav variant="tabs" className="mt-1 mx-1">
+      <CContainer className="flex-grow-1 py-4 app-content">
+        <CCard className="app-card">
+          <CNav variant="tabs" className="mt-1 mx-1 app-nav">
             <CNavItem>
               <CNavLink
                 active={activeTab === "upload"}
@@ -66,11 +64,10 @@ function App() {
               </CNavLink>
             </CNavItem>
           </CNav>
-
-          <CCardBody>
+          <CCardBody className="app-card-body">
             {activeTab === "upload" ? (
               <>
-                <div className="text-center mb-4">
+                <div className="text-center mb-4 app-upload-header">
                   <h2>MT940 File Converter</h2>
                   <p className="text-medium-emphasis">
                     Upload your MT940 file and convert it to CSV or Excel
@@ -89,8 +86,7 @@ function App() {
                   <>
                     <DashboardStats transactions={transactions} />
                     <TransactionsTable transactions={transactions} />
-
-                    <CRow className="mt-4 text-center justify-content-center g-3">
+                    <CRow className="mt-4 text-center justify-content-center app-buttons-row">
                       <CCol xs="auto">
                         <CButton
                           color="success"
@@ -125,7 +121,6 @@ function App() {
           </CCardBody>
         </CCard>
       </CContainer>
-
       <Footer />
     </div>
   );

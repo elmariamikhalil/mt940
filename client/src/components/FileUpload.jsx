@@ -20,11 +20,9 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
       alert("Please select a file first.");
       return;
     }
-
     setIsLoading(true);
     const formData = new FormData();
     formData.append("mt940File", file);
-
     try {
       const res = await apiService.convertMT940(formData);
       onUploadComplete(res.data.transactions);
@@ -38,7 +36,6 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
-
     if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
     } else if (e.type === "dragleave") {
@@ -50,7 +47,6 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       setFile(e.dataTransfer.files[0]);
     }
@@ -63,7 +59,7 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
   };
 
   return (
-    <CCard className="shadow-sm">
+    <CCard className="file-upload-card">
       <CCardBody>
         <div
           onDragEnter={handleDrag}
@@ -71,8 +67,8 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
           onDragOver={handleDrag}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current.click()}
-          className={`border rounded p-5 text-center ${
-            dragActive ? "border-primary bg-light" : "border-secondary"
+          className={`file-upload-area border rounded p-5 text-center ${
+            dragActive ? "drag-active" : "drag-inactive"
           }`}
           style={{
             borderStyle: "dashed",
@@ -87,9 +83,8 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
             onChange={handleFileChange}
             style={{ display: "none" }}
           />
-
           <div className="d-flex flex-column align-items-center">
-            <div className="mb-3 bg-primary-subtle text-primary p-3 rounded-circle">
+            <div className="mb-3 upload-icon-wrapper text-primary p-3 rounded-circle">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width={32}
@@ -102,25 +97,25 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
                 <path d="M7.646 7.146a.5.5 0 0 1 .708 0L9.5 8.293V3.5a.5.5 0 0 1 1 0v4.793l1.146-1.147a.5.5 0 0 1 .708.708l-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 0 1 0-.708z" />
               </svg>
             </div>
-
-            <h5 className="fw-semibold">
+            <h5 className="fw-semibold file-upload-title">
               {file ? file.name : "Drag & drop or click to select file"}
             </h5>
-            <p className="text-medium-emphasis small">
+            <p className="text-medium-emphasis small file-upload-info">
               {file
                 ? `${(file.size / 1024).toFixed(2)} KB`
                 : "Supported: .mt940, .sta"}
             </p>
-
             {file && (
-              <CAlert color="success" className="mt-2 py-1 px-3 w-auto">
+              <CAlert
+                color="success"
+                className="mt-2 py-1 px-3 file-upload-alert"
+              >
                 File selected
               </CAlert>
             )}
           </div>
         </div>
-
-        <div className="mt-4 text-center">
+        <div className="mt-4 text-center file-upload-button-wrapper">
           <CButton
             color="primary"
             disabled={!file || isLoading}
@@ -136,19 +131,18 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
             )}
           </CButton>
         </div>
-
-        <div className="mt-4 text-center">
+        <div className="mt-4 text-center file-upload-supported-banks">
           <small className="text-medium-emphasis fw-semibold">
             Supported Bank Formats:
           </small>
-          <div className="d-flex justify-content-center flex-wrap gap-2 mt-2">
+          <div className="d-flex justify-content-center flex-wrap gap-2 mt-2 bank-badges-wrapper">
             {["SWIFT MT940", "SEPA", "Rabobank", "ABN AMRO", "ING"].map(
               (bank) => (
                 <CBadge
                   key={bank}
                   color="secondary"
                   shape="rounded-pill"
-                  className="px-3"
+                  className="px-3 bank-badge"
                 >
                   {bank}
                 </CBadge>

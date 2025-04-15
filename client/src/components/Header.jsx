@@ -4,45 +4,50 @@ import {
   CContainer,
   CHeaderBrand,
   CHeaderNav,
-  CHeaderNavItem,
-  CHeaderNavLink,
+  CNavItem,
+  CNavLink,
   CButton,
 } from "@coreui/react";
 import CIcon from "@coreui/icons-react";
 import { cilMoon, cilSun } from "@coreui/icons";
-
 const Header = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
-
+  // Initialize dark mode based on localStorage or system preference
   useEffect(() => {
-    // Check if user prefers dark mode
-    const isDark =
-      localStorage.getItem("darkMode") === "true" ||
-      (window.matchMedia &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches);
-
+    const savedDarkMode = localStorage.getItem("darkMode");
+    const prefersDark =
+      window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const isDark = savedDarkMode ? savedDarkMode === "true" : prefersDark;
+    console.log("Initializing dark mode:", {
+      savedDarkMode,
+      prefersDark,
+      isDark,
+    });
     setIsDarkMode(isDark);
-
     if (isDark) {
-      document.documentElement.classList.add("dark-theme");
+      document.body.classList.add("dark-theme");
+      console.log("Dark mode class added on init");
     } else {
-      document.documentElement.classList.remove("dark-theme");
+      document.body.classList.remove("dark-theme");
+      console.log("Dark mode class removed on init");
     }
   }, []);
-
+  // Toggle dark mode
   const toggleDarkMode = () => {
     const newDarkMode = !isDarkMode;
+    console.log("Toggling dark mode to:", newDarkMode);
     setIsDarkMode(newDarkMode);
-
     if (newDarkMode) {
-      document.documentElement.classList.add("dark-theme");
+      document.body.classList.add("dark-theme");
       localStorage.setItem("darkMode", "true");
+      console.log("Dark mode class added on toggle");
     } else {
-      document.documentElement.classList.remove("dark-theme");
+      document.body.classList.remove("dark-theme");
       localStorage.setItem("darkMode", "false");
+      console.log("Dark mode class removed on toggle");
     }
   };
-
   return (
     <CHeader position="sticky" className="mb-0 border-bottom">
       <CContainer fluid>
@@ -63,11 +68,10 @@ const Header = () => {
           </svg>
           <span className="fs-5 fw-semibold">MT940 Converter</span>
         </CHeaderBrand>
-
         <CHeaderNav className="ms-auto d-flex align-items-center">
-          <CHeaderNavItem>
+          <CNavItem>
             <CButton
-              color="light"
+              color={isDarkMode ? "dark" : "light"}
               shape="rounded-pill"
               size="sm"
               onClick={toggleDarkMode}
@@ -75,9 +79,9 @@ const Header = () => {
             >
               <CIcon icon={isDarkMode ? cilSun : cilMoon} size="sm" />
             </CButton>
-          </CHeaderNavItem>
-          <CHeaderNavItem>
-            <CHeaderNavLink
+          </CNavItem>
+          {/* <CNavItem>
+            <CNavLink
               href="https://github.com/elmariamikhalil/mt940-converter"
               target="_blank"
               rel="noopener noreferrer"
@@ -95,12 +99,11 @@ const Header = () => {
                   clipRule="evenodd"
                 />
               </svg>
-            </CHeaderNavLink>
-          </CHeaderNavItem>
+            </CNavLink>
+          </CNavItem> */}
         </CHeaderNav>
       </CContainer>
     </CHeader>
   );
 };
-
 export default Header;
