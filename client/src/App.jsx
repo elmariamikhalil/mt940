@@ -24,65 +24,11 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("upload");
 
-  const downloadFile = async (type) => {
-    console.log(""); // Clear any previous errors
-    try {
-      let downloadPromise;
-      let filename;
-      if (type === "csv") {
-        downloadPromise = apiService.downloadCSV();
-        filename = "transactions.csv";
-      } else if (type === "excel") {
-        downloadPromise = apiService.downloadExcel();
-        filename = "statement.xlsx";
-      } else {
-        throw new Error("Invalid download type");
-      }
-
-      const response = await downloadPromise;
-
-      if (!response || response.status !== 200) {
-        let errorText = "Unknown error";
-        if (response.data && !(response.data instanceof Blob)) {
-          errorText = response.data.error || JSON.stringify(response.data);
-        }
-        throw new Error(
-          `Failed to download ${type.toUpperCase()}: Status ${
-            response.status || "N/A"
-          } - ${errorText}`
-        );
-      }
-
-      const blob = response.data;
-      if (!(blob instanceof Blob)) {
-        throw new Error(
-          `Failed to download ${type.toUpperCase()}: Response data is not a valid file.`
-        );
-      }
-
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
-    } catch (error) {
-      console.error("Download error:", error);
-      let message = error.message || `Failed to download ${type.toUpperCase()}`;
-      if (error.status === 400) {
-        message = `Failed to download ${type.toUpperCase()}: No transactions available. Please upload an MT940 file first.`;
-      } else if (error.status === 404) {
-        message = `Failed to download ${type.toUpperCase()}: Endpoint not found. Please contact support.`;
-      } else if (
-        error.message.includes("Network") ||
-        error.message.includes("N/A")
-      ) {
-        message +=
-          " (Cannot connect to server. Please ensure the server is running or contact support.)";
-      }
-      console.log(message);
+  const downloadFile = (type) => {
+    if (type === "csv") {
+      window.location.href = apiService.downloadCSV();
+    } else if (type === "excel") {
+      window.location.href = apiService.downloadExcel();
     }
   };
 
