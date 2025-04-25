@@ -16,16 +16,23 @@ function cleanAccountNumber(accountNumber) {
   console.log("Raw account number:", accountNumber);
 
   // Remove any currency code or prefix before the IBAN
-  // Handle common separators: slash, space, or other delimiters
-  const parts = accountNumber.split(/\/|\s+|,|;|-/);
+  // Handle common separators: slash, space, comma, semicolon, hyphen, or other delimiters
+  const parts = accountNumber.split(/\/|\s+|,|;|-|:/);
   for (let part of parts) {
     // IBANs typically start with 2 letters followed by numbers (e.g., DE123456...)
     if (/^[A-Z]{2}\d{2}/.test(part)) {
       console.log("Cleaned IBAN found:", part);
-      return part;
+      return part.trim();
     }
   }
-  // If no clear IBAN format is found, return the last part as fallback (common in MT940)
+  // If no clear IBAN format is found, try to remove known currency codes explicitly
+  const currencyRegex = /^(EUR|USD|GBP|CHF|JPY|AUD|CAD|NOK|SEK|DKK|NZD)/i;
+  const cleaned = accountNumber.replace(currencyRegex, "").trim();
+  if (/^[A-Z]{2}\d{2}/.test(cleaned)) {
+    console.log("Cleaned IBAN after removing currency code:", cleaned);
+    return cleaned;
+  }
+  // As a last resort, return the last part as fallback (common in MT940)
   const fallback = parts[parts.length - 1].trim();
   console.log("No clear IBAN format found, using fallback:", fallback);
   return fallback;
