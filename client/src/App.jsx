@@ -29,38 +29,23 @@ function App() {
   const downloadFile = async (type) => {
     setErrorMessage(""); // Clear any previous errors
     try {
-      let url;
+      let downloadPromise;
       let filename;
       if (type === "csv") {
-        url = apiService.downloadCSV(); // Assuming this returns the endpoint URL
+        downloadPromise = apiService.downloadCSV(); // Updated to use axios promise
         filename = "transactions.csv";
       } else if (type === "excel") {
-        url = apiService.downloadExcel(); // Assuming this returns the endpoint URL
+        downloadPromise = apiService.downloadExcel(); // Updated to use axios promise
         filename = "statement.xlsx";
       } else {
         throw new Error("Invalid download type");
       }
 
-      // Use fetch to download the file
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/octet-stream",
-        },
-      });
-
-      if (!response.ok) {
-        // Handle non-200 responses (e.g., 404, 500)
-        const errorText = await response.text();
-        throw new Error(
-          `Failed to download ${type.toUpperCase()}: ${response.status} - ${
-            errorText || response.statusText
-          }`
-        );
-      }
+      // Await the axios response
+      const response = await downloadPromise;
 
       // Create a blob from the response and trigger download
-      const blob = await response.blob();
+      const blob = response.data; // axios returns the blob directly in response.data
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = downloadUrl;
@@ -71,9 +56,16 @@ function App() {
       window.URL.revokeObjectURL(downloadUrl);
     } catch (error) {
       console.error("Download error:", error);
-      setErrorMessage(
-        error.message || `Failed to download ${type.toUpperCase()}`
-      );
+      let message = error.message || `Failed to download ${type.toUpperCase()}`;
+      if (error.status === 400) {
+        message = `Failed to download ${type.toUpperCase()}: No transactions available. Please upload an MT940 file first.`;
+      } else if (error.status === 404) {
+        message = `Failed to download ${type.toUpperCase()}: Endpoint not found. Please contact support.`;
+      } else if (error.message.includes("Network")) {
+        message +=
+          " (Connection issue. Please check your network or contact support.)";
+      }
+      setErrorMessage(message);
     }
   };
 
@@ -143,6 +135,7 @@ function App() {
                           color="success"
                           variant="outline"
                           onClick={() => downloadFile("csv")}
+                          disabled={transactions.length === 0}
                         >
                           Download CSV
                         </CButton>
@@ -152,6 +145,7 @@ function App() {
                           color="primary"
                           variant="outline"
                           onClick={() => downloadFile("excel")}
+                          disabled={transactions.length === 0}
                         >
                           Download Excel
                         </CButton>
