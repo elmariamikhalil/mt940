@@ -17,7 +17,7 @@ app.use(bodyParser.json());
 // Serve static files (uploads)
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Multer setup for file uploads
+// Multer setup for file uploads (expecting field name 'file')
 const upload = multer({ dest: "uploads/" });
 
 // Store transactions globally (for simplicity)
@@ -31,10 +31,12 @@ app.post("/api/convert", upload.single("file"), async (req, res) => {
     const transactions = parseMT940(fileContent);
     latestTransactions = transactions;
     const displayTransactions = transactions.map((tx) => ({
-      date: tx.displayDate.replace(/"/g, ""),
+      date: tx.displayDate || "01-01-2023",
       amount:
-        tx.cdIndicator === "D" ? -parseFloat(tx.amount) : parseFloat(tx.amount),
-      description: tx.description,
+        tx.cdIndicator === "D"
+          ? -parseFloat(tx.amount || 0)
+          : parseFloat(tx.amount || 0),
+      description: tx.description || "No description",
     }));
     res.json({ transactions: displayTransactions });
   } catch (error) {
@@ -85,14 +87,14 @@ app.get("/api/download/excel", async (req, res) => {
     ];
     latestTransactions.forEach((tx) => {
       const row = {
-        accountNumber: tx.accountNumber,
-        shortValueDate: tx.shortValueDate,
-        isoValueDate: tx.isoValueDate,
-        displayDate: tx.displayDate,
-        amount: tx.amount,
-        amountComma: tx.amountComma,
-        cdIndicator: tx.cdIndicator,
-        description: tx.description,
+        accountNumber: tx.accountNumber || "N/A",
+        shortValueDate: tx.shortValueDate || "N/A",
+        isoValueDate: tx.isoValueDate || "N/A",
+        displayDate: tx.displayDate || "N/A",
+        amount: tx.amount || "0.00",
+        amountComma: tx.amountComma || "0,00",
+        cdIndicator: tx.cdIndicator || "N/A",
+        description: tx.description || "N/A",
       };
       worksheet.addRow(row);
     });
