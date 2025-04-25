@@ -47,7 +47,7 @@ const apiService = {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-      responseType: "blob",
+      responseType: "blob", // Handle binary data for file download
     }),
   // Download endpoints - Use /api/download to match backend
   downloadCSV: () =>
