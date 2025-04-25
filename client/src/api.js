@@ -2,7 +2,7 @@ import axios from "axios";
 
 // ✅ Updated Base URL: use new subdomain or fallback
 const apiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL || "https://mt940.axoplan.com:5002/api";
+  import.meta.env.VITE_API_BASE_URL || "https://mt940.axoplan.com/api";
 
 // Create axios instance with default config
 const axiosInstance = axios.create({
