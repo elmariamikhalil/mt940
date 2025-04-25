@@ -9,7 +9,7 @@ const fs = require("fs");
 const app = express();
 app.use(cors());
 
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 5002;
 
 // Middleware to parse JSON
 app.use(bodyParser.json());
