@@ -308,6 +308,51 @@ function formatMasterbalanceCSV(transactions) {
   return csv;
 }
 
+// Numbers to XLSX Conversion Endpoint
+app.post("/api/convert-numbers", upload.single("file"), async (req, res) => {
+  try {
+    let numbersArray = [];
+    if (req.file) {
+      const fileContent = fs.readFileSync(req.file.path, { encoding: "utf8" });
+      numbersArray = fileContent
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => line.split(",").map((val) => val.trim()));
+    } else if (req.body.numbersData) {
+      numbersArray = req.body.numbersData
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => line.split(",").map((val) => val.trim()));
+    } else {
+      return res
+        .status(400)
+        .json({ error: "No numbers data or file provided" });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Numbers");
+    numbersArray.forEach((row) => {
+      worksheet.addRow(row);
+    });
+
+    const uploadDir = path.join(__dirname, "uploads");
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    const filePath = path.join(uploadDir, "numbers.xlsx");
+    await workbook.xlsx.writeFile(filePath);
+
+    res.download(filePath, "numbers.xlsx", (err) => {
+      if (err) {
+        console.error("Error during file download:", err);
+        res.status(500).json({ error: "Error downloading the file" });
+      }
+    });
+  } catch (error) {
+    console.error("Error converting numbers to XLSX:", error);
+    res.status(500).json({ error: "Error converting numbers to XLSX" });
+  }
+});
 // ✅ Use axoplan SSL cert (valid for all subdomains like mt940.axoplan.com)
 const options = {
   cert: fs.readFileSync(

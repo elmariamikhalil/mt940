@@ -42,6 +42,13 @@ const apiService = {
         "Content-Type": "multipart/form-data",
       },
     }),
+  convertNumbersToXlsx: (formData) =>
+    axiosInstance.post("/api/convert-numbers", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      responseType: "blob",
+    }),
   // Download endpoints - Use /api/download to match backend
   downloadCSV: () =>
     axiosInstance.get("/api/download/csv", {
