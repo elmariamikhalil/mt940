@@ -25,7 +25,7 @@ function App() {
   const [activeTab, setActiveTab] = useState("upload");
 
   const downloadFile = async (type) => {
-    setErrorMessage(""); // Clear any previous errors
+    console.log(""); // Clear any previous errors
     try {
       let downloadPromise;
       let filename;
