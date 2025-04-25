@@ -34,12 +34,13 @@ function parseMT940(content) {
   let currentAccountNumber = "";
   let currentTransaction = null;
   let descriptionLines = [];
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     // Account number line
     if (line.startsWith(":25:")) {
       const rawAccountNumber = line.substring(4);
-      currentAccountNumber = cleanAccountNumber(rawAccountNumber); // Clean the account number to remove currency
+      currentAccountNumber = cleanAccountNumber(rawAccountNumber); // Clean the account number
     }
     // Transaction line
     else if (line.startsWith(":61:")) {
