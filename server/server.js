@@ -22,8 +22,10 @@ app.use("/api", routes);
 
 // ✅ Use axoplan SSL cert (valid for all subdomains like mt940.axoplan.com)
 const options = {
-  cert: fs.readFileSync("/etc/letsencrypt/live/axoplan.com/fullchain.pem"),
-  key: fs.readFileSync("/etc/letsencrypt/live/axoplan.com/privkey.pem"),
+  cert: fs.readFileSync(
+    "/etc/letsencrypt/live/mt940.axoplan.com/fullchain.pem"
+  ),
+  key: fs.readFileSync("/etc/letsencrypt/live/mt940.axoplan.com/privkey.pem"),
 };
 
 // Start HTTPS server
