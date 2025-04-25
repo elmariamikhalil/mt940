@@ -48,9 +48,13 @@ function App() {
       if (!response || response.status !== 200) {
         let errorText = "Unknown error";
         if (response.data) {
-          // Attempt to extract error message if response.data is JSON
           try {
-            errorText = response.data.error || JSON.stringify(response.data);
+            // Attempt to parse error message if response.data is not a Blob
+            if (!(response.data instanceof Blob)) {
+              errorText = response.data.error || JSON.stringify(response.data);
+            } else {
+              errorText = "Unexpected response format";
+            }
           } catch (e) {
             errorText = "Failed to parse error message";
           }
@@ -86,9 +90,12 @@ function App() {
         message = `Failed to download ${type.toUpperCase()}: No transactions available. Please upload an MT940 file first.`;
       } else if (error.status === 404) {
         message = `Failed to download ${type.toUpperCase()}: Endpoint not found. Please contact support.`;
-      } else if (error.message.includes("Network")) {
+      } else if (
+        error.message.includes("Network") ||
+        error.message.includes("N/A")
+      ) {
         message +=
-          " (Connection issue. Please check your network or contact support.)";
+          " (Connection issue. Please check if the server is running or contact support.)";
       }
       setErrorMessage(message);
     }
