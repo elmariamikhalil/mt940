@@ -15,7 +15,7 @@ const axiosInstance = axios.create({
 // Add a request interceptor (optional auth token logic here)
 axiosInstance.interceptors.request.use(
   (config) => {
-    // Optionally attach auth tokens here
+    console.log(`Making request to: ${config.url}`); // Log request URL for debugging
     return config;
   },
   (error) => Promise.reject(error)
@@ -29,26 +29,29 @@ axiosInstance.interceptors.response.use(
       message: error.response?.data?.message || "Network error occurred",
       status: error.response?.status || 500,
     };
-
     console.error("API Error:", customError);
-
     return Promise.reject(customError);
   }
 );
 
 // API endpoints as methods
 const apiService = {
-  // MT940 Conversion
+  // MT940 Conversion - Use /api/convert to match backend
   convertMT940: (formData) =>
-    axiosInstance.post("/convert", formData, {
+    axiosInstance.post("/api/convert", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
     }),
-
-  // Download endpoints
-  downloadCSV: () => `${apiBaseUrl}/download/csv`,
-  downloadExcel: () => `${apiBaseUrl}/download/excel`,
+  // Download endpoints - Use /api/download to match backend
+  downloadCSV: () =>
+    axiosInstance.get("/api/download/csv", {
+      responseType: "blob", // Handle binary data for file download
+    }),
+  downloadExcel: () =>
+    axiosInstance.get("/api/download/excel", {
+      responseType: "blob", // Handle binary data for file download
+    }),
 };
 
 export default apiService;
