@@ -23,26 +23,12 @@ const upload = multer({ dest: "uploads/" });
 // Store transactions globally (for simplicity)
 let latestTransactions = [];
 
-// Import routes if they exist, otherwise define them directly
-let routes;
-try {
-  routes = require("./routes/routes");
-  app.use("/api", routes);
-  console.log("Routes loaded from ./routes/routes.js");
-} catch (error) {
-  console.error(
-    "Could not load routes from ./routes/routes.js:",
-    error.message || error
-  );
-  // Define routes directly as fallback
-}
-
-// MT940 Conversion Endpoint (fallback if not in routes.js)
+// MT940 Conversion Endpoint
 app.post("/api/convert", upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
   try {
     const fileContent = fs.readFileSync(req.file.path, { encoding: "utf8" });
-    const transactions = parseMT940(fileContent); // Implement or import parseMT940 as needed
+    const transactions = parseMT940(fileContent);
     latestTransactions = transactions;
     const displayTransactions = transactions.map((tx) => ({
       date: tx.displayDate.replace(/"/g, ""),
@@ -52,15 +38,12 @@ app.post("/api/convert", upload.single("file"), async (req, res) => {
     }));
     res.json({ transactions: displayTransactions });
   } catch (error) {
-    console.error(
-      "Error parsing MT940 file:",
-      error.message || error.toString()
-    );
+    console.error("Error parsing MT940 file:", error.message || error);
     res.status(500).json({ error: "Error parsing MT940 file" });
   }
 });
 
-// Download CSV Endpoint (fallback if not in routes.js)
+// Download CSV Endpoint
 app.get("/api/download/csv", (req, res) => {
   if (latestTransactions.length === 0) {
     return res.status(400).json({
@@ -69,17 +52,17 @@ app.get("/api/download/csv", (req, res) => {
     });
   }
   try {
-    const csv = formatMasterbalanceCSV(latestTransactions); // Implement or import formatMasterbalanceCSV as needed
+    const csv = formatMasterbalanceCSV(latestTransactions);
     res.header("Content-Type", "text/csv");
     res.attachment("transactions.csv");
     res.send(csv);
   } catch (error) {
-    console.error("Error generating CSV:", error.message || error.toString());
+    console.error("Error generating CSV:", error.message || error);
     res.status(500).json({ error: "Error generating CSV" });
   }
 });
 
-// Download Excel Endpoint (fallback if not in routes.js)
+// Download Excel Endpoint
 app.get("/api/download/excel", async (req, res) => {
   if (latestTransactions.length === 0) {
     return res.status(400).json({
@@ -126,21 +109,60 @@ app.get("/api/download/excel", async (req, res) => {
     }
     res.download(filePath, "statement.xlsx", (err) => {
       if (err) {
-        console.error(
-          "Error during file download:",
-          err.message || err.toString()
-        );
+        console.error("Error during file download:", err.message || err);
         res.status(500).json({ error: "Error downloading the file" });
       }
     });
   } catch (error) {
-    console.error(
-      "Error generating Excel file:",
-      error.message || error.toString()
-    );
+    console.error("Error generating Excel file:", error.message || error);
     res.status(500).json({ error: "Error generating Excel file" });
   }
 });
+
+// Placeholder for parseMT940 (minimal implementation)
+function parseMT940(content) {
+  console.log("Parsing MT940 content (placeholder)");
+  return [
+    {
+      accountNumber: "TEST123456789",
+      shortValueDate: "231001",
+      isoValueDate: "2023-10-01",
+      displayDate: "01-10-2023",
+      amount: "100.00",
+      amountComma: "100,00",
+      cdIndicator: "C",
+      description: "Test Transaction",
+    },
+  ];
+}
+
+// Placeholder for formatMasterbalanceCSV (minimal implementation)
+function formatMasterbalanceCSV(transactions) {
+  console.log("Formatting CSV (placeholder)");
+  let csv = "";
+  transactions.forEach((tx) => {
+    const accountNumber = `"${tx.accountNumber}"`;
+    const shortDate = `"${tx.shortValueDate}"`;
+    const isoDate = `"${tx.isoValueDate}"`;
+    const displayDate = `"${tx.displayDate}"`;
+    const amountDot = `"${tx.amount}"`;
+    const amountComma = `"${tx.amountComma}"`;
+    const cdIndicator = `"${tx.cdIndicator}"`;
+    const description = `"${tx.description.replace(/"/g, '""')}"`;
+    const line = [
+      accountNumber,
+      shortDate,
+      isoDate,
+      displayDate,
+      amountDot,
+      amountComma,
+      cdIndicator,
+      description,
+    ].join(";");
+    csv += line + "\n";
+  });
+  return csv;
+}
 
 // ✅ Use axoplan SSL cert (valid for all subdomains like mt940.axoplan.com)
 const options = {
