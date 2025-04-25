@@ -1,9 +1,8 @@
 import axios from "axios";
 
-// Read environment variables or fallback to default
-// Checking original App.jsx to see where the API was pointed
+// ✅ Updated Base URL: use new subdomain or fallback
 const apiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL || "https://axoplan.com:5002/api";
+  import.meta.env.VITE_API_BASE_URL || "https://api.mt940.axoplan.com/api";
 
 // Create axios instance with default config
 const axiosInstance = axios.create({
@@ -13,10 +12,10 @@ const axiosInstance = axios.create({
   },
 });
 
-// Add a request interceptor for handling auth tokens if needed
+// Add a request interceptor (optional auth token logic here)
 axiosInstance.interceptors.request.use(
   (config) => {
-    // You can add authentication tokens here if needed
+    // Optionally attach auth tokens here
     return config;
   },
   (error) => Promise.reject(error)
@@ -47,7 +46,7 @@ const apiService = {
       },
     }),
 
-  // Download files
+  // Download endpoints
   downloadCSV: () => `${apiBaseUrl}/download/csv`,
   downloadExcel: () => `${apiBaseUrl}/download/excel`,
 };
