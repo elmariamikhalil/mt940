@@ -23,15 +23,21 @@ const upload = multer({ dest: "uploads/" });
 // Store transactions globally (for simplicity, as in earlier code)
 let latestTransactions = [];
 
-// Import routes or define them directly
-// If routes.js already defines /convert, /download/csv, and /download/excel, ensure they match
-const routes = require("./routes/routes");
+// Import routes if they exist, otherwise define them directly
+let routes;
+try {
+  routes = require("./routes/routes");
+  app.use("/api", routes);
+  console.log("Routes loaded from ./routes/routes.js");
+} catch (error) {
+  console.error(
+    "Could not load routes from ./routes/routes.js:",
+    error.message
+  );
+  // Define routes directly if ./routes/routes.js is not available or fails
+}
 
-// Use the routes for handling MT940 conversion
-app.use("/api", routes);
-
-// ✅ Define fallback routes directly if not in routes.js
-// MT940 Conversion Endpoint
+// MT940 Conversion Endpoint (fallback if not in routes.js)
 app.post("/api/convert", upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
   try {
@@ -46,12 +52,12 @@ app.post("/api/convert", upload.single("file"), async (req, res) => {
     }));
     res.json({ transactions: displayTransactions });
   } catch (error) {
-    console.error("Error parsing MT940 file:", error);
+    console.error("Error parsing MT940 file:", error.message || error);
     res.status(500).json({ error: "Error parsing MT940 file" });
   }
 });
 
-// Download CSV Endpoint
+// Download CSV Endpoint (fallback if not in routes.js)
 app.get("/api/download/csv", (req, res) => {
   if (latestTransactions.length === 0) {
     return res
@@ -64,12 +70,12 @@ app.get("/api/download/csv", (req, res) => {
     res.attachment("transactions.csv");
     res.send(csv);
   } catch (error) {
-    console.error("Error generating CSV:", error);
+    console.error("Error generating CSV:", error.message || error);
     res.status(500).json({ error: "Error generating CSV" });
   }
 });
 
-// Download Excel Endpoint
+// Download Excel Endpoint (fallback if not in routes.js)
 app.get("/api/download/excel", async (req, res) => {
   if (latestTransactions.length === 0) {
     return res
@@ -115,20 +121,13 @@ app.get("/api/download/excel", async (req, res) => {
     }
     res.download(filePath, "statement.xlsx", (err) => {
       if (err) {
-        console.error("Error during file download:", err);
+        console.error("Error during file download:", err.message || err);
         res.status(500).json({ error: "Error downloading the file" });
       }
     });
   } catch (error) {
-    console.error("Error generating Excel file:", error);
+    console.error("Error generating Excel file:", error.message || error);
     res.status(500).json({ error: "Error generating Excel file" });
-  }
-});
-
-// Log all registered routes for debugging
-app._router.stack.forEach((r) => {
-  if (r.route && r.route.path) {
-    console.log(`Route: ${r.route.path}`);
   }
 });
 
