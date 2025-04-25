@@ -36,7 +36,6 @@ axiosInstance.interceptors.response.use(
 
 // API endpoints as methods
 const apiService = {
-  // MT940 Conversion - Use /api/convert to match backend
   convertMT940: (formData) =>
     axiosInstance.post("/api/convert", formData, {
       headers: {

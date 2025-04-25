@@ -22,7 +22,7 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
     }
     setIsLoading(true);
     const formData = new FormData();
-    formData.append("file", file); // Changed from "mt940File" to "file" to match backend multer config
+    formData.append("file", file); // Use "file" to match backend multer config
     try {
       const res = await apiService.convertMT940(formData);
       onUploadComplete(res.data.transactions);

@@ -23,7 +23,7 @@ const upload = multer({ dest: "uploads/" });
 // Store transactions globally (for simplicity)
 let latestTransactions = [];
 
-// MT940 Conversion Endpoint - Define both /api/convert and /convert to cover all bases
+// MT940 Conversion Endpoint - Define both /api/convert and /convert
 app.post("/api/convert", upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
   try {
@@ -45,7 +45,7 @@ app.post("/api/convert", upload.single("file"), async (req, res) => {
   }
 });
 
-// Also define /convert for backward compatibility or mismatch
+// Also define /convert for compatibility
 app.post("/convert", upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
   try {
