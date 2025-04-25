@@ -7,21 +7,50 @@ const fs = require("fs");
 const multer = require("multer");
 const ExcelJS = require("exceljs");
 const app = express();
-
 app.use(cors());
 const port = process.env.PORT || 5002;
-
 // Middleware to parse JSON
 app.use(bodyParser.json());
-
 // Serve static files (uploads)
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
 // Multer setup for file uploads
 const upload = multer({ dest: "uploads/" });
-
 // Store transactions globally (for simplicity)
 let latestTransactions = [];
+
+/**
+ * Clean account number to remove currency or other prefixes/suffixes
+ */
+function cleanAccountNumber(accountNumber) {
+  // Log the raw account number for debugging
+  console.log("Raw account number:", accountNumber);
+
+  // Remove any currency code or prefix before or after the IBAN
+  // Handle common separators: slash, space, comma, semicolon, hyphen, or other delimiters
+  const parts = accountNumber.split(/\/|\s+|,|;|-|:/);
+  for (let part of parts) {
+    // IBANs typically start with 2 letters followed by numbers (e.g., NL23BUNQ...)
+    if (/^[A-Z]{2}\d{2}/.test(part)) {
+      console.log("Cleaned IBAN found:", part);
+      return part.trim();
+    }
+  }
+  // If no clear IBAN format is found, try to remove known currency codes explicitly
+  const currencyRegex = /^(EUR|USD|GBP|CHF|JPY|AUD|CAD|NOK|SEK|DKK|NZD)/i;
+  let cleaned = accountNumber.replace(currencyRegex, "").trim();
+  // Also remove currency codes at the end (e.g., "NL23BUNQ... EUR")
+  cleaned = cleaned
+    .replace(/(EUR|USD|GBP|CHF|JPY|AUD|CAD|NOK|SEK|DKK|NZD)$/i, "")
+    .trim();
+  if (/^[A-Z]{2}\d{2}/.test(cleaned)) {
+    console.log("Cleaned IBAN after removing currency code:", cleaned);
+    return cleaned;
+  }
+  // As a last resort, return the last part as fallback (common in MT940)
+  const fallback = parts[parts.length - 1].trim();
+  console.log("No clear IBAN format found, using fallback:", fallback);
+  return fallback;
+}
 
 // MT940 Conversion Endpoint
 app.post("/api/convert", upload.single("file"), async (req, res) => {
@@ -88,7 +117,7 @@ app.get("/api/download/excel", async (req, res) => {
     ];
     latestTransactions.forEach((tx) => {
       const row = {
-        accountNumber: tx.accountNumber || "N/A",
+        accountNumber: tx.accountNumber || "N/A", // Cleaned account number (no currency)
         shortValueDate: tx.shortValueDate || "N/A",
         isoValueDate: tx.isoValueDate || "N/A",
         displayDate: tx.displayDate || "N/A",
@@ -133,7 +162,8 @@ function parseMT940(content) {
     const line = lines[i].trim();
     // Account number line
     if (line.startsWith(":25:")) {
-      currentAccountNumber = line.substring(4);
+      const rawAccountNumber = line.substring(4);
+      currentAccountNumber = cleanAccountNumber(rawAccountNumber); // Clean the account number to remove currency
     }
     // Transaction line
     else if (line.startsWith(":61:")) {
@@ -226,7 +256,7 @@ function parseTransactionLine(line, accountNumber) {
     }
   }
   return {
-    accountNumber: accountNumber,
+    accountNumber: accountNumber, // Cleaned account number (no currency)
     shortValueDate: shortValueDate,
     isoValueDate: isoValueDate,
     displayDate: displayDate,
@@ -254,7 +284,7 @@ function formatMasterbalanceCSV(transactions) {
   let csv = "";
   transactions.forEach((tx) => {
     // Format each field exactly as masterbalance.nl does
-    const accountNumber = `"${tx.accountNumber}"`;
+    const accountNumber = `"${tx.accountNumber}"`; // Cleaned account number (no currency)
     const shortDate = `"${tx.shortValueDate}"`;
     const isoDate = `"${tx.isoValueDate}"`;
     const displayDate = `"${tx.displayDate}"`;
@@ -285,7 +315,6 @@ const options = {
   ),
   key: fs.readFileSync("/etc/letsencrypt/live/mt940.axoplan.com/privkey.pem"),
 };
-
 // Start HTTPS server
 https.createServer(options, app).listen(port, () => {
   console.log(`✅ Server is running on https://mt940.axoplan.com:${port}`);
