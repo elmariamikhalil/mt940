@@ -1,8 +1,8 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const path = require("path");
-const routes = require("./routes/routes"); // Adjust path if needed
-const cors = require("cors"); // Import cors package
+const routes = require("./routes/routes");
+const cors = require("cors");
 const https = require("https");
 const fs = require("fs");
 
@@ -20,13 +20,13 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // Use the routes for handling MT940 conversion
 app.use("/api", routes);
 
-// SSL Certificate paths
+// ✅ Use axoplan SSL cert (valid for all subdomains like mt940.axoplan.com)
 const options = {
-  cert: fs.readFileSync("/etc/letsencrypt/live/graphtsy.org/fullchain.pem"),
-  key: fs.readFileSync("/etc/letsencrypt/live/graphtsy.org/privkey.pem"), // Replace with your SSL cert path
+  cert: fs.readFileSync("/etc/letsencrypt/live/axoplan.com/fullchain.pem"),
+  key: fs.readFileSync("/etc/letsencrypt/live/axoplan.com/privkey.pem"),
 };
 
-// Use https.createServer instead of app.listen to serve over HTTPS
+// Start HTTPS server
 https.createServer(options, app).listen(port, () => {
-  console.log(`Server is running on https://localhost:${port}`);
+  console.log(`✅ Server is running on https://mt940.axoplan.com:${port}`);
 });
