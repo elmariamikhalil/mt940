@@ -3,7 +3,7 @@ import axios from "axios";
 // Read environment variables or fallback to default
 // Checking original App.jsx to see where the API was pointed
 const apiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+  import.meta.env.VITE_API_BASE_URL || "https://axoplan.com:5002/api";
 
 // Create axios instance with default config
 const axiosInstance = axios.create({
