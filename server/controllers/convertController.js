@@ -34,13 +34,12 @@ function parseMT940(content) {
   let currentAccountNumber = "";
   let currentTransaction = null;
   let descriptionLines = [];
-
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     // Account number line
     if (line.startsWith(":25:")) {
       const rawAccountNumber = line.substring(4);
-      currentAccountNumber = cleanAccountNumber(rawAccountNumber); // Clean the account number
+      currentAccountNumber = cleanAccountNumber(rawAccountNumber); // Clean the account number to remove currency
     }
     // Transaction line
     else if (line.startsWith(":61:")) {
@@ -135,7 +134,7 @@ function parseTransactionLine(line, accountNumber) {
     }
   }
   return {
-    accountNumber: accountNumber,
+    accountNumber: accountNumber, // Cleaned account number (no currency) is used here
     shortValueDate: shortValueDate,
     isoValueDate: isoValueDate,
     displayDate: displayDate,
@@ -167,7 +166,7 @@ function formatMasterbalanceCSV(transactions) {
   let csv = "";
   transactions.forEach((tx) => {
     // Format each field exactly as masterbalance.nl does
-    const accountNumber = `"${tx.accountNumber}"`; // Cleaned account number used here
+    const accountNumber = `"${tx.accountNumber}"`; // Cleaned account number (no currency)
     const shortDate = `"${tx.shortValueDate}"`;
     const isoDate = `"${tx.isoValueDate}"`;
     const displayDate = `"${tx.displayDate}"`;
@@ -237,7 +236,7 @@ exports.downloadExcel = async (req, res) => {
     // Add rows for each transaction
     latestTransactions.forEach((tx) => {
       const row = {
-        accountNumber: tx.accountNumber, // Cleaned account number used here
+        accountNumber: tx.accountNumber, // Cleaned account number (no currency)
         shortValueDate: tx.shortValueDate,
         isoValueDate: tx.isoValueDate,
         displayDate: tx.displayDate,
