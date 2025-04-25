@@ -20,7 +20,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // Multer setup for file uploads
 const upload = multer({ dest: "uploads/" });
 
-// Store transactions globally (for simplicity, as in earlier code)
+// Store transactions globally (for simplicity)
 let latestTransactions = [];
 
 // Import routes if they exist, otherwise define them directly
@@ -32,9 +32,9 @@ try {
 } catch (error) {
   console.error(
     "Could not load routes from ./routes/routes.js:",
-    error.message
+    error.message || error
   );
-  // Define routes directly if ./routes/routes.js is not available or fails
+  // Define routes directly as fallback
 }
 
 // MT940 Conversion Endpoint (fallback if not in routes.js)
@@ -52,7 +52,10 @@ app.post("/api/convert", upload.single("file"), async (req, res) => {
     }));
     res.json({ transactions: displayTransactions });
   } catch (error) {
-    console.error("Error parsing MT940 file:", error.message || error);
+    console.error(
+      "Error parsing MT940 file:",
+      error.message || error.toString()
+    );
     res.status(500).json({ error: "Error parsing MT940 file" });
   }
 });
@@ -60,9 +63,10 @@ app.post("/api/convert", upload.single("file"), async (req, res) => {
 // Download CSV Endpoint (fallback if not in routes.js)
 app.get("/api/download/csv", (req, res) => {
   if (latestTransactions.length === 0) {
-    return res
-      .status(400)
-      .json({ error: "No transactions available for download" });
+    return res.status(400).json({
+      error:
+        "No transactions available for download. Please upload and process an MT940 file first.",
+    });
   }
   try {
     const csv = formatMasterbalanceCSV(latestTransactions); // Implement or import formatMasterbalanceCSV as needed
@@ -70,7 +74,7 @@ app.get("/api/download/csv", (req, res) => {
     res.attachment("transactions.csv");
     res.send(csv);
   } catch (error) {
-    console.error("Error generating CSV:", error.message || error);
+    console.error("Error generating CSV:", error.message || error.toString());
     res.status(500).json({ error: "Error generating CSV" });
   }
 });
@@ -78,9 +82,10 @@ app.get("/api/download/csv", (req, res) => {
 // Download Excel Endpoint (fallback if not in routes.js)
 app.get("/api/download/excel", async (req, res) => {
   if (latestTransactions.length === 0) {
-    return res
-      .status(400)
-      .json({ error: "No transactions available for download" });
+    return res.status(400).json({
+      error:
+        "No transactions available for download. Please upload and process an MT940 file first.",
+    });
   }
   try {
     const workbook = new ExcelJS.Workbook();
@@ -121,12 +126,18 @@ app.get("/api/download/excel", async (req, res) => {
     }
     res.download(filePath, "statement.xlsx", (err) => {
       if (err) {
-        console.error("Error during file download:", err.message || err);
+        console.error(
+          "Error during file download:",
+          err.message || err.toString()
+        );
         res.status(500).json({ error: "Error downloading the file" });
       }
     });
   } catch (error) {
-    console.error("Error generating Excel file:", error.message || error);
+    console.error(
+      "Error generating Excel file:",
+      error.message || error.toString()
+    );
     res.status(500).json({ error: "Error generating Excel file" });
   }
 });
