@@ -32,10 +32,10 @@ function App() {
       let downloadPromise;
       let filename;
       if (type === "csv") {
-        downloadPromise = apiService.downloadCSV(); // Updated to use axios promise
+        downloadPromise = apiService.downloadCSV(); // Should return axios promise
         filename = "transactions.csv";
       } else if (type === "excel") {
-        downloadPromise = apiService.downloadExcel(); // Updated to use axios promise
+        downloadPromise = apiService.downloadExcel(); // Should return axios promise
         filename = "statement.xlsx";
       } else {
         throw new Error("Invalid download type");
@@ -44,8 +44,33 @@ function App() {
       // Await the axios response
       const response = await downloadPromise;
 
-      // Create a blob from the response and trigger download
-      const blob = response.data; // axios returns the blob directly in response.data
+      // Check if the response status is OK before processing as Blob
+      if (!response || response.status !== 200) {
+        let errorText = "Unknown error";
+        if (response.data) {
+          // Attempt to extract error message if response.data is JSON
+          try {
+            errorText = response.data.error || JSON.stringify(response.data);
+          } catch (e) {
+            errorText = "Failed to parse error message";
+          }
+        }
+        throw new Error(
+          `Failed to download ${type.toUpperCase()}: Status ${
+            response.status || "N/A"
+          } - ${errorText}`
+        );
+      }
+
+      // At this point, response.data should be a Blob
+      const blob = response.data;
+      if (!(blob instanceof Blob)) {
+        throw new Error(
+          `Failed to download ${type.toUpperCase()}: Response data is not a valid file.`
+        );
+      }
+
+      // Create a blob URL and trigger download
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = downloadUrl;
