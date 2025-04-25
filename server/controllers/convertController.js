@@ -12,17 +12,23 @@ let latestTransactions = []; // Store transactions for download
  * Clean account number to remove currency or other prefixes/suffixes
  */
 function cleanAccountNumber(accountNumber) {
+  // Log the raw account number for debugging
+  console.log("Raw account number:", accountNumber);
+
   // Remove any currency code or prefix before the IBAN
-  // Assuming currency is separated by a slash or space, or is a 3-letter code at the start
-  const parts = accountNumber.split(/\/|\s+/);
+  // Handle common separators: slash, space, or other delimiters
+  const parts = accountNumber.split(/\/|\s+|,|;|-/);
   for (let part of parts) {
     // IBANs typically start with 2 letters followed by numbers (e.g., DE123456...)
     if (/^[A-Z]{2}\d{2}/.test(part)) {
+      console.log("Cleaned IBAN found:", part);
       return part;
     }
   }
-  // If no clear IBAN format is found, return the last part (common in MT940)
-  return parts[parts.length - 1].trim();
+  // If no clear IBAN format is found, return the last part as fallback (common in MT940)
+  const fallback = parts[parts.length - 1].trim();
+  console.log("No clear IBAN format found, using fallback:", fallback);
+  return fallback;
 }
 
 /**
@@ -34,13 +40,12 @@ function parseMT940(content) {
   let currentAccountNumber = "";
   let currentTransaction = null;
   let descriptionLines = [];
-
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     // Account number line
     if (line.startsWith(":25:")) {
       const rawAccountNumber = line.substring(4);
-      currentAccountNumber = cleanAccountNumber(rawAccountNumber); // Clean the account number
+      currentAccountNumber = cleanAccountNumber(rawAccountNumber); // Clean the account number to remove currency
     }
     // Transaction line
     else if (line.startsWith(":61:")) {
