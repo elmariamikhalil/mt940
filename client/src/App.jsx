@@ -9,6 +9,7 @@ import {
   CButton,
   CRow,
   CCol,
+  CAlert,
 } from "@coreui/react";
 import FileUpload from "./components/FileUpload";
 import TransactionsTable from "./components/TransactionsTable";
@@ -23,12 +24,56 @@ function App() {
   const [transactions, setTransactions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("upload");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const downloadFile = (type) => {
-    if (type === "csv") {
-      window.location.href = apiService.downloadCSV();
-    } else if (type === "excel") {
-      window.location.href = apiService.downloadExcel();
+  const downloadFile = async (type) => {
+    setErrorMessage(""); // Clear any previous errors
+    try {
+      let url;
+      let filename;
+      if (type === "csv") {
+        url = apiService.downloadCSV(); // Assuming this returns the endpoint URL
+        filename = "transactions.csv";
+      } else if (type === "excel") {
+        url = apiService.downloadExcel(); // Assuming this returns the endpoint URL
+        filename = "statement.xlsx";
+      } else {
+        throw new Error("Invalid download type");
+      }
+
+      // Use fetch to download the file
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/octet-stream",
+        },
+      });
+
+      if (!response.ok) {
+        // Handle non-200 responses (e.g., 404, 500)
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to download ${type.toUpperCase()}: ${response.status} - ${
+            errorText || response.statusText
+          }`
+        );
+      }
+
+      // Create a blob from the response and trigger download
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("Download error:", error);
+      setErrorMessage(
+        error.message || `Failed to download ${type.toUpperCase()}`
+      );
     }
   };
 
@@ -36,6 +81,7 @@ function App() {
     setTransactions(data);
     setActiveTab("results");
     setIsLoading(false);
+    setErrorMessage(""); // Clear any errors on successful upload
   };
 
   return (
@@ -86,6 +132,11 @@ function App() {
                   <>
                     <DashboardStats transactions={transactions} />
                     <TransactionsTable transactions={transactions} />
+                    {errorMessage && (
+                      <CAlert color="danger" className="mt-3">
+                        {errorMessage}
+                      </CAlert>
+                    )}
                     <CRow className="mt-4 text-center justify-content-center app-buttons-row">
                       <CCol xs="auto">
                         <CButton
