@@ -19,7 +19,7 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import DashboardStats from "./components/DashboardStats";
 import apiService from "./api";
-import * as XLSX from "xlsx"; // Import SheetJS for Excel generation
+import * as XLSX from "xlsx";
 import "@coreui/coreui/dist/css/coreui.min.css";
 import "./App.css";
 
@@ -28,28 +28,26 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("upload");
   const [errorMessage, setErrorMessage] = useState("");
-  const [numbersData, setNumbersData] = useState(""); // State for numbers input
-  const [numbersFile, setNumbersFile] = useState(null); // State for uploaded numbers file
+  const [numbersData, setNumbersData] = useState("");
+  const [numbersFile, setNumbersFile] = useState(null);
 
   const downloadFile = async (type) => {
-    setErrorMessage(""); // Clear any previous errors
+    setErrorMessage("");
     try {
       let downloadPromise;
       let filename;
       if (type === "csv") {
-        downloadPromise = apiService.downloadCSV(); // Should return axios promise with responseType: "blob"
+        downloadPromise = apiService.downloadCSV();
         filename = "transactions.csv";
       } else if (type === "excel") {
-        downloadPromise = apiService.downloadExcel(); // Should return axios promise with responseType: "blob"
+        downloadPromise = apiService.downloadExcel();
         filename = "statement.xlsx";
       } else {
         throw new Error("Invalid download type");
       }
 
-      // Await the axios response
       const response = await downloadPromise;
 
-      // Check if the response status is OK before processing as Blob
       if (!response || response.status !== 200) {
         let errorText = "Unknown error";
         if (response.data && !(response.data instanceof Blob)) {
@@ -62,7 +60,6 @@ function App() {
         );
       }
 
-      // At this point, response.data should be a Blob
       const blob = response.data;
       if (!(blob instanceof Blob)) {
         throw new Error(
@@ -70,7 +67,6 @@ function App() {
         );
       }
 
-      // Create a blob URL and trigger download
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = downloadUrl;
@@ -83,7 +79,7 @@ function App() {
       console.error("Download error:", error);
       let message = error.message || `Failed to download ${type.toUpperCase()}`;
       if (error.status === 400) {
-        message = `Failed to download ${type.toUpperCase()}: No transactions available. Please upload an MT940 file first.`;
+        message = `Failed to download ${type.toUpperCase()}: No transactions available. Please upload an MT940 or FIN file first.`;
       } else if (error.status === 404) {
         message = `Failed to download ${type.toUpperCase()}: Endpoint not found. Please contact support.`;
       } else if (
@@ -101,11 +97,11 @@ function App() {
     setTransactions(data);
     setActiveTab("results");
     setIsLoading(false);
-    setErrorMessage(""); // Clear any errors on successful upload
+    setErrorMessage("");
   };
 
   const handleNumbersToXlsx = async () => {
-    setErrorMessage(""); // Clear any previous errors
+    setErrorMessage("");
     setIsLoading(true);
     try {
       let formData = new FormData();
@@ -156,12 +152,10 @@ function App() {
 
   const generateXlsx = (numbersArray) => {
     try {
-      // Create a new workbook and worksheet using SheetJS (xlsx)
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.aoa_to_sheet(numbersArray);
       XLSX.utils.book_append_sheet(workbook, worksheet, "Numbers");
 
-      // Generate binary data for download
       const wbout = XLSX.write(workbook, { bookType: "xlsx", type: "binary" });
       const blob = new Blob([s2ab(wbout)], {
         type: "application/octet-stream",
@@ -182,7 +176,6 @@ function App() {
     }
   };
 
-  // Helper function to convert string to array buffer for SheetJS
   const s2ab = (s) => {
     const buf = new ArrayBuffer(s.length);
     const view = new Uint8Array(buf);
@@ -210,7 +203,7 @@ function App() {
                 onClick={() => setActiveTab("upload")}
                 className="cursor-pointer"
               >
-                Upload MT940
+                Upload MT940/FIN
               </CNavLink>
             </CNavItem>
             <CNavItem>
@@ -237,9 +230,9 @@ function App() {
             {activeTab === "upload" ? (
               <>
                 <div className="text-center mb-4 app-upload-header">
-                  <h2>MT940 File Converter</h2>
+                  <h2>MT940/FIN File Converter</h2>
                   <p className="text-medium-emphasis">
-                    Upload your MT940 file and convert it to CSV or Excel
+                    Upload your MT940 or FIN file and convert it to CSV or Excel
                     format.
                   </p>
                 </div>
@@ -294,7 +287,6 @@ function App() {
                 )}
               </>
             ) : (
-              // Numbers to XLSX Tab
               <>
                 <div className="text-center mb-4 app-upload-header">
                   <h2>Numbers to XLSX Converter</h2>

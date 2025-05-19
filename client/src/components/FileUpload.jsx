@@ -13,22 +13,27 @@ import apiService from "../api";
 const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
   const [file, setFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
+  const [error, setError] = useState(""); // Added state for error messages
   const fileInputRef = useRef(null);
 
   const handleUpload = async () => {
     if (!file) {
-      alert("Please select a file first.");
+      setError("Please select a file first.");
       return;
     }
     setIsLoading(true);
+    setError("");
     const formData = new FormData();
-    formData.append("file", file); // Use "file" to match backend multer config
+    formData.append("file", file); // Matches backend Multer config
     try {
       const res = await apiService.convertMT940(formData);
       onUploadComplete(res.data.transactions);
     } catch (error) {
       console.error("Upload error:", error);
-      alert("There was an error uploading your file. Please try again.");
+      setError(
+        error.response?.data?.error ||
+          "There was an error uploading your file. Please try again."
+      );
       setIsLoading(false);
     }
   };
@@ -48,13 +53,31 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
+      const droppedFile = e.dataTransfer.files[0];
+      const ext = droppedFile.name.toLowerCase().split(".").pop();
+      if (["mt940", "sta", "fin"].includes(ext)) {
+        setFile(droppedFile);
+        setError("");
+      } else {
+        setError(
+          "Invalid file type. Please upload a .mt940, .sta, or .fin file."
+        );
+      }
     }
   };
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      const ext = selectedFile.name.toLowerCase().split(".").pop();
+      if (["mt940", "sta", "fin"].includes(ext)) {
+        setFile(selectedFile);
+        setError("");
+      } else {
+        setError(
+          "Invalid file type. Please upload a .mt940, .sta, or .fin file."
+        );
+      }
     }
   };
 
@@ -79,7 +102,7 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
           <CFormInput
             ref={fileInputRef}
             type="file"
-            accept=".mt940,.sta"
+            accept=".mt940,.sta,.fin" // Added .fin
             onChange={handleFileChange}
             style={{ display: "none" }}
           />
@@ -103,7 +126,8 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
             <p className="text-medium-emphasis small file-upload-info">
               {file
                 ? `${(file.size / 1024).toFixed(2)} KB`
-                : "Supported: .mt940, .sta"}
+                : "Supported: .mt940, .sta, .fin"}{" "}
+              // Updated to include .fin
             </p>
             {file && (
               <CAlert
@@ -111,6 +135,14 @@ const FileUpload = ({ setIsLoading, isLoading, onUploadComplete }) => {
                 className="mt-2 py-1 px-3 file-upload-alert"
               >
                 File selected
+              </CAlert>
+            )}
+            {error && (
+              <CAlert
+                color="danger"
+                className="mt-2 py-1 px-3 file-upload-alert"
+              >
+                {error}
               </CAlert>
             )}
           </div>
