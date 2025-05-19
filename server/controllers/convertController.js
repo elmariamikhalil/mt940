@@ -97,13 +97,14 @@ function parseTransactionLine(line, accountNumber) {
   // Remove :61: prefix
   const txData = line.substring(4);
   // Extract the value date (first 6 chars are YYMMDD)
-  const valueYY = txData.substring(0, 2);
-  const valueMM = txData.substring(2, 4);
-  const valueDD = txData.substring(4, 6);
-  // Initialize with value date
-  let entryDD = valueDD;
-  let entryMM = valueMM;
-  let entryYY = valueYY;
+  const yymmdd = txData.substring(0, 6); // e.g., 240530
+  const yearPrefix = yymmdd.startsWith("24") ? "20" : "19"; // Assuming 24 is 2024
+  const year = yearPrefix + yymmdd.substring(0, 2); // e.g., 2024
+  const month = yymmdd.substring(2, 4); // e.g., 05
+  const day = yymmdd.substring(4, 6); // e.g., 30
+  const isoDate = `${year}-${month}-${day}`; // e.g., 2024-05-30
+  const displayDate = `${day}-${month}-${year}`; // e.g., 30-05-2024
+
   // Find C/D indicator position
   let cdPos = -1;
   for (let j = 6; j < txData.length; j++) {
@@ -112,46 +113,35 @@ function parseTransactionLine(line, accountNumber) {
       break;
     }
   }
-  // Check for entry date (MMDD) between value date and C/D
-  if (cdPos >= 10) {
-    const entryDate = txData.substring(6, 10);
-    if (/^\d{4}$/.test(entryDate)) {
-      entryMM = entryDate.substring(0, 2);
-      entryDD = entryDate.substring(2, 4);
-    }
-  }
-  // Format dates exactly as masterbalance.nl does
-  const shortValueDate = `${valueYY}${valueMM}${valueDD}`; // YYMMDD
-  const isoValueDate = `20${valueYY}-${valueMM}-${valueDD}`; // YYYY-MM-DD
-  const displayDate = `${entryDD}-${entryMM}-20${valueYY}`; // DD-MM-YYYY
-  // Extract credit/debit indicator and amount
-  let amount = "0";
-  let amountComma = "0";
-  let cdIndicator = "D"; // Default to debit
+
+  let cdIndicator = "D";
+  let amountStr = "0.00";
   if (cdPos > 0) {
     cdIndicator = txData[cdPos];
-    // Extract amount
-    const nPos = txData.indexOf("N", cdPos);
-    if (nPos > cdPos) {
-      amount = txData.substring(cdPos + 1, nPos);
-      // Store both formats of the amount (with dot and with comma)
-      amountComma = amount; // With comma as is in the file
-      amount = amount.replace(",", "."); // With dot for calculations
-      // Ensure trailing zeroes are handled like masterbalance.nl does
-      if (!amount.includes(".")) {
-        amount = amount + ".";
-      }
-      if (!amountComma.includes(",")) {
-        amountComma = amountComma + ",";
-      }
+    // Extract amount after C/D until a delimiter (N, space, or end)
+    let endPos = txData.indexOf("N", cdPos);
+    if (endPos === -1 || endPos > txData.length - 1) endPos = txData.length;
+    amountStr = txData.substring(cdPos + 1, endPos).trim();
+
+    // Handle comma as decimal separator and ensure valid number
+    if (amountStr.includes(",")) {
+      amountStr = amountStr.replace(",", ".");
+    }
+    if (!amountStr.match(/^\d+\.?\d{0,2}$/)) {
+      amountStr = "0.00"; // Fallback if amount is invalid
     }
   }
+
+  const amount = parseFloat(amountStr) || 0.0;
+  const amountDot = `R${amount.toFixed(2)}`; // e.g., R82.73
+  const amountComma = amountDot.replace(".", ","); // e.g., R82,73
+
   return {
-    accountNumber: accountNumber, // Cleaned account number (no currency) is used here
-    shortValueDate: shortValueDate,
-    isoValueDate: isoValueDate,
+    accountNumber: accountNumber,
+    shortValueDate: yymmdd,
+    isoValueDate: isoDate,
     displayDate: displayDate,
-    amount: amount,
+    amountDot: amountDot,
     amountComma: amountComma,
     cdIndicator: cdIndicator,
     description: "",
@@ -169,38 +159,44 @@ function buildDescription(lines) {
   return fullText
     .replace(/\//g, " ") // Replace all slashes with spaces
     .replace(/\s+/g, " ") // Normalize spaces
-    .trim();
+    .trim()
+    .replace(/"/g, '""'); // Escape double quotes for CSV
 }
 
 /**
  * Format transactions as CSV in the exact format of masterbalance.nl
  */
 function formatMasterbalanceCSV(transactions) {
-  let csv = "";
-  transactions.forEach((tx) => {
-    // Format each field exactly as masterbalance.nl does
-    const accountNumber = `"${tx.accountNumber}"`; // Cleaned account number (no currency)
-    const shortDate = `"${tx.shortValueDate}"`;
-    const isoDate = `"${tx.isoValueDate}"`;
-    const displayDate = `"${tx.displayDate}"`;
-    const amountDot = `"${tx.amount}"`;
-    const amountComma = `"${tx.amountComma}"`;
-    const cdIndicator = `"${tx.cdIndicator}"`;
-    const description = `"${tx.description.replace(/"/g, '""')}"`;
-    // Join with semicolons exactly as masterbalance.nl does
-    const line = [
-      accountNumber,
-      shortDate,
-      isoDate,
-      displayDate,
-      amountDot,
-      amountComma,
-      cdIndicator,
-      description,
-    ].join(";");
-    csv += line + "\n";
-  });
-  return csv;
+  const header =
+    [
+      "Account Number",
+      "YYMMDD",
+      "YYYY-MM-DD",
+      "DD-MM-YYYY",
+      "Amount (Dot)",
+      "Amount (Comma)",
+      "C/D",
+      "Description",
+    ]
+      .map((field) => `"${field}"`)
+      .join(";") + "\n";
+
+  const rows = transactions
+    .map((tx) => {
+      return [
+        `"${tx.accountNumber}"`,
+        `"${tx.shortValueDate}"`,
+        `"${tx.isoValueDate}"`,
+        `"${tx.displayDate}"`,
+        `"${tx.amountDot}"`,
+        `"${tx.amountComma}"`,
+        `"${tx.cdIndicator}"`,
+        `"${tx.description}"`,
+      ].join(";");
+    })
+    .join("\n");
+
+  return header + rows;
 }
 
 // Handle conversion of the uploaded MT940 file
@@ -215,9 +211,12 @@ exports.handleConvert = async (req, res) => {
     const displayTransactions = transactions.map((tx) => ({
       date: tx.displayDate.replace(/"/g, ""),
       amount:
-        tx.cdIndicator === "D" ? -parseFloat(tx.amount) : parseFloat(tx.amount),
+        tx.cdIndicator === "D"
+          ? -parseFloat(tx.amountDot.replace("R", "").replace(",", "."))
+          : parseFloat(tx.amountDot.replace("R", "").replace(",", ".")),
       description: tx.description,
     }));
+    console.log("Parsed transactions for API:", displayTransactions); // Add for debugging
     res.json({ transactions: displayTransactions });
   } catch (error) {
     console.error("Error parsing MT940 file:", error);
@@ -241,7 +240,7 @@ exports.downloadExcel = async (req, res) => {
       { header: "Date (YYMMDD)", key: "shortValueDate", width: 15 },
       { header: "Date (ISO)", key: "isoValueDate", width: 15 },
       { header: "Date", key: "displayDate", width: 15 },
-      { header: "Amount", key: "amount", width: 15 },
+      { header: "Amount", key: "amountDot", width: 15 },
       { header: "Amount (comma)", key: "amountComma", width: 15 },
       { header: "D/C", key: "cdIndicator", width: 5 },
       { header: "Description", key: "description", width: 70 },
@@ -249,11 +248,11 @@ exports.downloadExcel = async (req, res) => {
     // Add rows for each transaction
     latestTransactions.forEach((tx) => {
       const row = {
-        accountNumber: tx.accountNumber, // Cleaned account number (no currency)
+        accountNumber: tx.accountNumber,
         shortValueDate: tx.shortValueDate,
         isoValueDate: tx.isoValueDate,
         displayDate: tx.displayDate,
-        amount: tx.amount,
+        amount: tx.amountDot,
         amountComma: tx.amountComma,
         cdIndicator: tx.cdIndicator,
         description: tx.description,
