@@ -132,24 +132,36 @@ function parseTransactionLine(line, accountNumber) {
   const isoDate = `${year}-${month}-${day}`; // e.g., 2024-05-30
   const displayDate = `${day}-${month}-${year}`; // e.g., 30-05-2024
 
+  let cdIndicator = "D";
+  let amountStr = "0.00";
   let cdPos = -1;
+
+  // Find the position of C or D
   for (let j = 6; j < txData.length; j++) {
     if (txData[j] === "C" || txData[j] === "D") {
       cdPos = j;
+      cdIndicator = txData[j];
       break;
     }
   }
-  let cdIndicator = "D";
-  let amount = "0.00";
+
   if (cdPos > 0) {
-    cdIndicator = txData[cdPos];
-    const nPos = txData.indexOf("N", cdPos);
-    if (nPos > cdPos) {
-      amount = txData.substring(cdPos + 1, nPos).replace(",", ".");
-      if (!amount.includes(".")) amount += ".00"; // Ensure two decimal places
+    // Extract amount after C/D until a delimiter (N, space, or end)
+    let endPos = txData.indexOf("N", cdPos);
+    if (endPos === -1 || endPos > txData.length - 1) endPos = txData.length;
+    amountStr = txData.substring(cdPos + 1, endPos).trim();
+
+    // Handle comma as decimal separator and ensure valid number
+    if (amountStr.includes(",")) {
+      amountStr = amountStr.replace(",", ".");
+    }
+    if (!amountStr.match(/^\d+\.?\d{0,2}$/)) {
+      amountStr = "0.00"; // Fallback if amount is invalid
     }
   }
-  const amountDot = `R${parseFloat(amount).toFixed(2)}`; // e.g., R82.73
+
+  const amount = parseFloat(amountStr) || 0.0;
+  const amountDot = `R${amount.toFixed(2)}`; // e.g., R82.73
   const amountComma = amountDot.replace(".", ","); // e.g., R82,73
 
   return {
