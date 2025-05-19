@@ -87,6 +87,7 @@ function parseMT940(content) {
   let currentAccountNumber = "";
   let currentTransaction = null;
   let descriptionLines = [];
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (line.startsWith(":25:")) {
@@ -123,12 +124,14 @@ function parseMT940(content) {
 // Parse transaction line and extract all required data
 function parseTransactionLine(line, accountNumber) {
   const txData = line.substring(4);
-  const valueYY = txData.substring(0, 2);
-  const valueMM = txData.substring(2, 4);
-  const valueDD = txData.substring(4, 6);
-  let entryDD = valueDD;
-  let entryMM = valueMM;
-  let entryYY = valueYY;
+  const yymmdd = txData.substring(0, 6); // e.g., 240530
+  const yearPrefix = yymmdd.startsWith("24") ? "20" : "19"; // Assuming 24 is 2024
+  const year = yearPrefix + yymmdd.substring(0, 2); // e.g., 2024
+  const month = yymmdd.substring(2, 4); // e.g., 05
+  const day = yymmdd.substring(4, 6); // e.g., 30
+  const isoDate = `${year}-${month}-${day}`; // e.g., 2024-05-30
+  const displayDate = `${day}-${month}-${year}`; // e.g., 30-05-2024
+
   let cdPos = -1;
   for (let j = 6; j < txData.length; j++) {
     if (txData[j] === "C" || txData[j] === "D") {
@@ -136,40 +139,25 @@ function parseTransactionLine(line, accountNumber) {
       break;
     }
   }
-  if (cdPos >= 10) {
-    const entryDate = txData.substring(6, 10);
-    if (/^\d{4}$/.test(entryDate)) {
-      entryMM = entryDate.substring(0, 2);
-      entryDD = entryDate.substring(2, 4);
-    }
-  }
-  const shortValueDate = `${valueYY}${valueMM}${valueDD}`;
-  const isoValueDate = `20${valueYY}-${valueMM}-${valueDD}`;
-  const displayDate = `${entryDD}-${entryMM}-20${valueYY}`;
-  let amount = "0";
-  let amountComma = "0";
   let cdIndicator = "D";
+  let amount = "0.00";
   if (cdPos > 0) {
     cdIndicator = txData[cdPos];
     const nPos = txData.indexOf("N", cdPos);
     if (nPos > cdPos) {
-      amount = txData.substring(cdPos + 1, nPos);
-      amountComma = amount;
-      amount = amount.replace(",", ".");
-      if (!amount.includes(".")) {
-        amount = amount + ".";
-      }
-      if (!amountComma.includes(",")) {
-        amountComma = amountComma + ",";
-      }
+      amount = txData.substring(cdPos + 1, nPos).replace(",", ".");
+      if (!amount.includes(".")) amount += ".00"; // Ensure two decimal places
     }
   }
+  const amountDot = `R${parseFloat(amount).toFixed(2)}`; // e.g., R82.73
+  const amountComma = amountDot.replace(".", ","); // e.g., R82,73
+
   return {
     accountNumber: accountNumber,
-    shortValueDate: shortValueDate,
-    isoValueDate: isoValueDate,
+    yymmdd: yymmdd,
+    isoDate: isoDate,
     displayDate: displayDate,
-    amount: amount,
+    amountDot: amountDot,
     amountComma: amountComma,
     cdIndicator: cdIndicator,
     description: "",
@@ -179,34 +167,45 @@ function parseTransactionLine(line, accountNumber) {
 // Build a clean description from the structured data
 function buildDescription(lines) {
   const fullText = lines.join(" ");
-  return fullText.replace(/\//g, " ").replace(/\s+/g, " ").trim();
+  return fullText
+    .replace(/\//g, " ") // Replace slashes with spaces
+    .replace(/\s+/g, " ") // Normalize multiple spaces
+    .trim()
+    .replace(/"/g, '""'); // Escape double quotes for CSV
 }
 
 // Format transactions as CSV in the exact format of masterbalance.nl
 function formatMasterbalanceCSV(transactions) {
-  let csv = "";
-  transactions.forEach((tx) => {
-    const accountNumber = `"${tx.accountNumber}"`;
-    const shortDate = `"${tx.shortValueDate}"`;
-    const isoDate = `"${tx.isoValueDate}"`;
-    const displayDate = `"${tx.displayDate}"`;
-    const amountDot = `"${tx.amount}"`;
-    const amountComma = `"${tx.amountComma}"`;
-    const cdIndicator = `"${tx.cdIndicator}"`;
-    const description = `"${tx.description.replace(/"/g, '""')}"`;
-    const line = [
-      accountNumber,
-      shortDate,
-      isoDate,
-      displayDate,
-      amountDot,
-      amountComma,
-      cdIndicator,
-      description,
-    ].join(";");
-    csv += line + "\n";
-  });
-  return csv;
+  const header =
+    [
+      "Account Number",
+      "YYMMDD",
+      "YYYY-MM-DD",
+      "DD-MM-YYYY",
+      "Amount (Dot)",
+      "Amount (Comma)",
+      "C/D",
+      "Description",
+    ]
+      .map((field) => `"${field}"`)
+      .join(";") + "\n";
+
+  const rows = transactions
+    .map((tx) => {
+      return [
+        `"${tx.accountNumber}"`,
+        `"${tx.yymmdd}"`,
+        `"${tx.isoDate}"`,
+        `"${tx.displayDate}"`,
+        `"${tx.amountDot}"`,
+        `"${tx.amountComma}"`,
+        `"${tx.cdIndicator}"`,
+        `"${tx.description}"`,
+      ].join(";");
+    })
+    .join("\n");
+
+  return header + rows;
 }
 
 // MT940 Conversion Endpoint
@@ -223,11 +222,11 @@ app.post("/api/convert", upload.single("file"), async (req, res) => {
         date: tx.displayDate.replace(/"/g, ""),
         amount:
           tx.cdIndicator === "D"
-            ? -parseFloat(tx.amount)
-            : parseFloat(tx.amount),
+            ? -parseFloat(tx.amountDot.replace("R", "").replace(",", "."))
+            : parseFloat(tx.amountDot.replace("R", "").replace(",", ".")),
         description: tx.description,
       };
-      console.log("Parsed transaction for API:", displayTx); // Add this line
+      console.log("Parsed transaction for API:", displayTx);
       return displayTx;
     });
     console.log("Transactions parsed successfully:", transactions.length);
@@ -270,10 +269,10 @@ app.get("/api/download/excel", async (req, res) => {
     const worksheet = workbook.addWorksheet("Transactions");
     worksheet.columns = [
       { header: "Account", key: "accountNumber", width: 25 },
-      { header: "Date (YYMMDD)", key: "shortValueDate", width: 15 },
-      { header: "Date (ISO)", key: "isoValueDate", width: 15 },
+      { header: "Date (YYMMDD)", key: "yymmdd", width: 15 },
+      { header: "Date (ISO)", key: "isoDate", width: 15 },
       { header: "Date", key: "displayDate", width: 15 },
-      { header: "Amount", key: "amount", width: 15 },
+      { header: "Amount", key: "amountDot", width: 15 },
       { header: "Amount (comma)", key: "amountComma", width: 15 },
       { header: "D/C", key: "cdIndicator", width: 5 },
       { header: "Description", key: "description", width: 70 },
@@ -281,11 +280,11 @@ app.get("/api/download/excel", async (req, res) => {
     latestTransactions.forEach((tx) => {
       const row = {
         accountNumber: tx.accountNumber || "N/A",
-        shortValueDate: tx.shortValueDate || "N/A",
-        isoValueDate: tx.isoValueDate || "N/A",
+        yymmdd: tx.yymmdd || "N/A",
+        isoDate: tx.isoDate || "N/A",
         displayDate: tx.displayDate || "N/A",
-        amount: tx.amount || "0.00",
-        amountComma: tx.amountComma || "0,00",
+        amountDot: tx.amountDot || "R0.00",
+        amountComma: tx.amountComma || "R0,00",
         cdIndicator: tx.cdIndicator || "N/A",
         description: tx.description || "N/A",
       };
