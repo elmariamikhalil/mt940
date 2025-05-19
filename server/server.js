@@ -80,7 +80,9 @@ function cleanAccountNumber(accountNumber) {
   return fallback;
 }
 
-// Parse MT940 file content
+/**
+ * Parse MT940 file content
+ */
 function parseMT940(content) {
   const transactions = [];
   const lines = content.split("\n");
@@ -100,7 +102,12 @@ function parseMT940(content) {
         }
         transactions.push(currentTransaction);
       }
-      currentTransaction = parseTransactionLine(line, currentAccountNumber);
+      // Pass descriptionLines to parseTransactionLine for amount fallback
+      currentTransaction = parseTransactionLine(
+        line,
+        currentAccountNumber,
+        descriptionLines
+      );
       descriptionLines = [];
     } else if (line.startsWith(":86:") && currentTransaction) {
       descriptionLines.push(line.substring(4));
@@ -121,8 +128,10 @@ function parseMT940(content) {
   return transactions;
 }
 
-// Parse transaction line and extract all required data
-function parseTransactionLine(line, accountNumber) {
+/**
+ * Parse transaction line and extract all required data
+ */
+function parseTransactionLine(line, accountNumber, descriptionLines) {
   const txData = line.substring(4);
   const yymmdd = txData.substring(0, 6); // e.g., 240530
   const yearPrefix = yymmdd.startsWith("24") ? "20" : "19"; // Assuming 24 is 2024
@@ -134,9 +143,9 @@ function parseTransactionLine(line, accountNumber) {
 
   let cdIndicator = "D";
   let amountStr = "0.00";
-  let cdPos = -1;
 
-  // Find the position of C or D
+  // Find C/D indicator position
+  let cdPos = -1;
   for (let j = 6; j < txData.length; j++) {
     if (txData[j] === "C" || txData[j] === "D") {
       cdPos = j;
@@ -155,8 +164,23 @@ function parseTransactionLine(line, accountNumber) {
     if (amountStr.includes(",")) {
       amountStr = amountStr.replace(",", ".");
     }
+
+    // Validate the amount format
     if (!amountStr.match(/^\d+\.?\d{0,2}$/)) {
-      amountStr = "0.00"; // Fallback if amount is invalid
+      amountStr = "0.00"; // Temporary fallback if :61: fails
+    }
+  }
+
+  // Fallback to description if :61: amount is invalid
+  if (amountStr === "0.00" && descriptionLines.length > 0) {
+    const description = descriptionLines.join(" ");
+    const amountMatch = description.match(/OCMT EUR([\d,.]+)/);
+    if (amountMatch && amountMatch[1]) {
+      amountStr = amountMatch[1].replace(",", ".");
+      // Validate the fallback amount
+      if (!amountStr.match(/^\d+\.?\d{0,2}$/)) {
+        amountStr = "0.00";
+      }
     }
   }
 
@@ -176,7 +200,9 @@ function parseTransactionLine(line, accountNumber) {
   };
 }
 
-// Build a clean description from the structured data
+/**
+ * Build a clean description from the structured data
+ */
 function buildDescription(lines) {
   const fullText = lines.join(" ");
   return fullText
@@ -186,7 +212,9 @@ function buildDescription(lines) {
     .replace(/"/g, '""'); // Escape double quotes for CSV
 }
 
-// Format transactions as CSV in the exact format of masterbalance.nl
+/**
+ * Format transactions as CSV in the exact format of masterbalance.nl
+ */
 function formatMasterbalanceCSV(transactions) {
   const header =
     [

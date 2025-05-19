@@ -40,6 +40,7 @@ function parseMT940(content) {
   let currentAccountNumber = "";
   let currentTransaction = null;
   let descriptionLines = [];
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (line.startsWith(":25:")) {
@@ -52,7 +53,12 @@ function parseMT940(content) {
         }
         transactions.push(currentTransaction);
       }
-      currentTransaction = parseTransactionLine(line, currentAccountNumber);
+      // Pass descriptionLines to parseTransactionLine for amount fallback
+      currentTransaction = parseTransactionLine(
+        line,
+        currentAccountNumber,
+        descriptionLines
+      );
       descriptionLines = [];
     } else if (line.startsWith(":86:") && currentTransaction) {
       descriptionLines.push(line.substring(4));
@@ -76,7 +82,7 @@ function parseMT940(content) {
 /**
  * Parse transaction line and extract all required data
  */
-function parseTransactionLine(line, accountNumber) {
+function parseTransactionLine(line, accountNumber, descriptionLines) {
   const txData = line.substring(4);
   const yymmdd = txData.substring(0, 6); // e.g., 240530
   const yearPrefix = yymmdd.startsWith("24") ? "20" : "19"; // Adjust based on year
@@ -118,16 +124,21 @@ function parseTransactionLine(line, accountNumber) {
       amountStr = amountStr.replace(",", ".");
     }
 
-    // Validate the amount format (e.g., 82.73 or 5.00)
+    // Validate the amount format
     if (!amountStr.match(/^\d+\.?\d{0,2}$/)) {
-      // Fallback to description field for amount if parsing fails
-      const nextLineIndex = line.indexOf("\n") + 1;
-      const description = line.substring(nextLineIndex) || "";
-      const amountMatch = description.match(/OCMT EUR([\d,.]+)/);
-      if (amountMatch && amountMatch[1]) {
-        amountStr = amountMatch[1].replace(",", ".");
-      } else {
-        amountStr = "0.00"; // Ultimate fallback
+      amountStr = "0.00"; // Temporary fallback if :61: fails
+    }
+  }
+
+  // Fallback to description if :61: amount is invalid
+  if (amountStr === "0.00" && descriptionLines.length > 0) {
+    const description = descriptionLines.join(" ");
+    const amountMatch = description.match(/OCMT EUR([\d,.]+)/);
+    if (amountMatch && amountMatch[1]) {
+      amountStr = amountMatch[1].replace(",", ".");
+      // Validate the fallback amount
+      if (!amountStr.match(/^\d+\.?\d{0,2}$/)) {
+        amountStr = "0.00";
       }
     }
   }
