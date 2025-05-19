@@ -32,21 +32,12 @@ const TransactionsTable = ({ transactions }) => {
     sortableItems.sort((a, b) => {
       if (sortConfig.key === "amount") {
         // Handle various amount formats safely
-        let amountA, amountB;
-        if (typeof a.amount === "string") {
-          amountA = parseFloat(a.amount.replace(/[^0-9.-]+/g, ""));
-        } else if (typeof a.amount === "number") {
-          amountA = a.amount;
-        } else {
-          amountA = 0;
-        }
-        if (typeof b.amount === "string") {
-          amountB = parseFloat(b.amount.replace(/[^0-9.-]+/g, ""));
-        } else if (typeof b.amount === "number") {
-          amountB = b.amount;
-        } else {
-          amountB = 0;
-        }
+        let amountA = parseFloat(
+          String(a.amount || "0").replace(/[^0-9.-]+/g, "")
+        );
+        let amountB = parseFloat(
+          String(b.amount || "0").replace(/[^0-9.-]+/g, "")
+        );
         // Check for NaN
         if (isNaN(amountA)) amountA = 0;
         if (isNaN(amountB)) amountB = 0;
@@ -118,13 +109,23 @@ const TransactionsTable = ({ transactions }) => {
 
   // Helper function to determine if amount is negative
   const isNegativeAmount = (amount) => {
-    if (typeof amount === "string") {
-      return amount.startsWith("-") || amount.includes("-");
-    } else if (typeof amount === "number") {
-      return amount < 0;
-    }
-    return false;
+    const numAmount = parseFloat(
+      String(amount || "0").replace(/[^0-9.-]+/g, "")
+    );
+    return !isNaN(numAmount) && numAmount < 0;
   };
+
+  // Format amount for display
+  const formatAmount = (amount) => {
+    const numAmount = parseFloat(
+      String(amount || "0").replace(/[^0-9.-]+/g, "")
+    );
+    if (isNaN(numAmount)) return "N/A";
+    return numAmount.toFixed(2); // Always show 2 decimal places
+  };
+
+  // Log transactions for debugging
+  console.log("Transactions in TransactionsTable:", transactions);
 
   if (!transactions || transactions.length === 0) return null;
 
@@ -197,13 +198,13 @@ const TransactionsTable = ({ transactions }) => {
                         : "text-success"
                     }`}
                   >
-                    {tx.amount}
+                    {formatAmount(tx.amount)}
                   </CTableDataCell>
                   <CTableDataCell
                     className="text-truncate transactions-description-cell"
                     style={{ maxWidth: "300px" }}
                   >
-                    {tx.description}
+                    {tx.description || "N/A"}
                   </CTableDataCell>
                 </CTableRow>
               ))}
@@ -226,7 +227,7 @@ const TransactionsTable = ({ transactions }) => {
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               >
-                <span aria-hidden="true">&laquo;</span>
+                <span aria-hidden="true">«</span>
               </CPaginationItem>
               {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
                 let pageNum;
@@ -259,7 +260,7 @@ const TransactionsTable = ({ transactions }) => {
                   setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                 }
               >
-                <span aria-hidden="true">&raquo;</span>
+                <span aria-hidden="true">»</span>
               </CPaginationItem>
             </CPagination>
           </div>
