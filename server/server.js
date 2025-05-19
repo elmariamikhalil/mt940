@@ -157,29 +157,35 @@ function parseTransactionLine(line, accountNumber, descriptionLines) {
   if (cdPos > 0) {
     // Extract amount after C/D until a delimiter (N, space, or end)
     let endPos = txData.indexOf("N", cdPos);
-    if (endPos === -1 || endPos > txData.length - 1) endPos = txData.length;
+    if (endPos === -1 || endPos > txData.length - 1) {
+      endPos = txData.length;
+    } else {
+      // Look ahead to ensure we don't cut off mid-number
+      while (endPos < txData.length && /\d/.test(txData[endPos - 1])) {
+        endPos++;
+      }
+    }
     amountStr = txData.substring(cdPos + 1, endPos).trim();
 
     // Handle comma as decimal separator and ensure valid number
-    if (amountStr.includes(",")) {
-      amountStr = amountStr.replace(",", ".");
-    }
-
-    // Validate the amount format
+    amountStr = amountStr.replace(/,/g, ".");
     if (!amountStr.match(/^\d+\.?\d{0,2}$/)) {
-      amountStr = "0.00"; // Temporary fallback if :61: fails
+      amountStr = "0.00"; // Fallback if :61: fails
+    } else {
+      amountStr = amountStr.replace(/\s+/g, ""); // Remove any spaces
     }
   }
 
   // Fallback to description if :61: amount is invalid
   if (amountStr === "0.00" && descriptionLines.length > 0) {
-    const description = descriptionLines.join(" ");
-    const amountMatch = description.match(/OCMT EUR([\d,.]+)/);
+    const description = descriptionLines.join(" ").trim();
+    const amountMatch = description.match(/OCMT EUR(\d+\.?\d*\s*\d{0,2})/i);
     if (amountMatch && amountMatch[1]) {
-      amountStr = amountMatch[1].replace(",", ".");
-      // Validate the fallback amount
+      amountStr = amountMatch[1].replace(/\s+/g, ""); // Remove spaces from amount
       if (!amountStr.match(/^\d+\.?\d{0,2}$/)) {
         amountStr = "0.00";
+      } else {
+        amountStr = amountStr.replace(/,/g, "."); // Ensure dot as decimal
       }
     }
   }
