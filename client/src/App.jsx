@@ -94,12 +94,12 @@ function App() {
   };
 
   const handleUploadComplete = (data) => {
+    console.log("Uploaded transactions from API:", data); // Add this line
     setTransactions(data);
     setActiveTab("results");
     setIsLoading(false);
     setErrorMessage("");
   };
-
   const handleNumbersToXlsx = async () => {
     setErrorMessage("");
     setIsLoading(true);

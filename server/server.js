@@ -218,12 +218,18 @@ app.post("/api/convert", upload.single("file"), async (req, res) => {
     console.log("File content read, parsing MT940...");
     const transactions = parseMT940(fileContent);
     latestTransactions = transactions;
-    const displayTransactions = transactions.map((tx) => ({
-      date: tx.displayDate.replace(/"/g, ""),
-      amount:
-        tx.cdIndicator === "D" ? -parseFloat(tx.amount) : parseFloat(tx.amount),
-      description: tx.description,
-    }));
+    const displayTransactions = transactions.map((tx) => {
+      const displayTx = {
+        date: tx.displayDate.replace(/"/g, ""),
+        amount:
+          tx.cdIndicator === "D"
+            ? -parseFloat(tx.amount)
+            : parseFloat(tx.amount),
+        description: tx.description,
+      };
+      console.log("Parsed transaction for API:", displayTx); // Add this line
+      return displayTx;
+    });
     console.log("Transactions parsed successfully:", transactions.length);
     res.json({ transactions: displayTransactions });
   } catch (error) {
