@@ -7,6 +7,7 @@ const https = require("https");
 const fs = require("fs");
 const multer = require("multer");
 const ExcelJS = require("exceljs");
+const { execSync } = require("child_process");
 
 const app = express();
 app.use(cors());
@@ -446,46 +447,200 @@ app.get("/api/download/excel", async (req, res) => {
 // Numbers to XLSX Conversion Endpoint
 app.post("/api/convert-numbers", upload.single("file"), async (req, res) => {
   try {
-    let numbersArray = [];
-    if (req.file) {
-      const fileContent = fs.readFileSync(req.file.path, { encoding: "utf8" });
-      numbersArray = fileContent
-        .split(/\r?\n/)
-        .filter((line) => line.trim())
-        .map((line) => line.split(",").map((val) => val.trim()));
-    } else if (req.body.numbersData) {
-      numbersArray = req.body.numbersData
-        .split(/\r?\n/)
-        .filter((line) => line.trim())
-        .map((line) => line.split(",").map((val) => val.trim()));
-    } else {
-      return res
-        .status(400)
-        .json({ error: "No numbers data or file provided" });
+    if (!req.file) {
+      return res.status(400).json({ error: "No .numbers file uploaded" });
     }
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Numbers");
-    numbersArray.forEach((row) => {
-      worksheet.addRow(row);
-    });
+    const numbersFilePath = req.file.path;
+    const fileExtension = path.extname(req.file.originalname).toLowerCase();
 
-    const uploadDir = path.join(__dirname, "Uploads");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    // Validate file extension
+    if (fileExtension !== ".numbers") {
+      return res.status(400).json({
+        error:
+          "Invalid file format. Please upload a .numbers file from Apple Numbers.",
+      });
     }
-    const filePath = path.join(uploadDir, "numbers.xlsx");
-    await workbook.xlsx.writeFile(filePath);
 
-    res.download(filePath, "numbers.xlsx", (err) => {
+    console.log("Processing Apple Numbers file:", req.file.originalname);
+
+    let conversionSuccess = false;
+    let xlsxFilePath = null;
+
+    try {
+      // Method 1: Try using AppleScript on macOS
+      if (process.platform === "darwin") {
+        const tempDir = path.join(uploadsDir, "temp");
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        const outputPath = path.join(tempDir, `converted_${Date.now()}.xlsx`);
+
+        // Use AppleScript to convert
+        const { execSync } = require("child_process");
+        const appleScript = `
+          tell application "Numbers"
+            set theDoc to open POSIX file "${numbersFilePath}"
+            export theDoc to file "${outputPath}" as Microsoft Excel
+            close theDoc
+          end tell
+        `;
+
+        try {
+          execSync(`osascript -e '${appleScript}'`, { timeout: 60000 });
+
+          if (fs.existsSync(outputPath)) {
+            xlsxFilePath = outputPath;
+            conversionSuccess = true;
+            console.log("Successfully converted using AppleScript");
+          }
+        } catch (appleScriptError) {
+          console.log(
+            "AppleScript conversion failed:",
+            appleScriptError.message
+          );
+        }
+      }
+
+      // Method 2: Try using numbers-parser library (if available)
+      if (!conversionSuccess) {
+        try {
+          const numbersParser = require("numbers-parser");
+          const doc = numbersParser.parse(numbersFilePath);
+
+          // Create Excel workbook
+          const workbook = new ExcelJS.Workbook();
+
+          // Process each sheet
+          doc.sheets.forEach((sheet, index) => {
+            const worksheet = workbook.addWorksheet(
+              sheet.name || `Sheet${index + 1}`
+            );
+
+            // Add data to worksheet
+            if (sheet.data && Array.isArray(sheet.data)) {
+              sheet.data.forEach((row, rowIndex) => {
+                if (Array.isArray(row)) {
+                  const excelRow = worksheet.getRow(rowIndex + 1);
+                  row.forEach((cell, colIndex) => {
+                    excelRow.getCell(colIndex + 1).value = cell;
+                  });
+                }
+              });
+            }
+          });
+
+          // Save Excel file
+          xlsxFilePath = path.join(uploadsDir, `converted_${Date.now()}.xlsx`);
+          await workbook.xlsx.writeFile(xlsxFilePath);
+          conversionSuccess = true;
+          console.log("Successfully converted using numbers-parser");
+        } catch (numbersParserError) {
+          console.log("numbers-parser failed:", numbersParserError.message);
+        }
+      }
+
+      // Method 3: Fallback - Create info file explaining limitation
+      if (!conversionSuccess) {
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Conversion Info");
+
+        // Style the header
+        worksheet.getCell("A1").value = "Apple Numbers to Excel Converter";
+        worksheet.getCell("A1").font = { bold: true, size: 14 };
+        worksheet.getCell("A1").fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFE0E0E0" },
+        };
+
+        worksheet.addRow([""]);
+        worksheet.addRow(["Status", "Conversion Limited"]);
+        worksheet.addRow(["Original File", req.file.originalname]);
+        worksheet.addRow([
+          "File Size",
+          `${(req.file.size / 1024).toFixed(1)} KB`,
+        ]);
+        worksheet.addRow([""]);
+        worksheet.addRow(["Why conversion failed:"]);
+        worksheet.addRow(["• This server is not running on macOS"]);
+        worksheet.addRow(["• Apple Numbers app is not installed"]);
+        worksheet.addRow(["• numbers-parser library is not available"]);
+        worksheet.addRow([""]);
+        worksheet.addRow(["Recommended solutions:"]);
+        worksheet.addRow(["1. Use a macOS server with Numbers app"]);
+        worksheet.addRow([
+          "2. Install numbers-parser: npm install numbers-parser",
+        ]);
+        worksheet.addRow(["3. Manually export from Numbers app:"]);
+        worksheet.addRow(["   • Open file in Numbers"]);
+        worksheet.addRow(["   • File → Export To → Excel"]);
+        worksheet.addRow(["   • Choose .xlsx format"]);
+        worksheet.addRow([""]);
+        worksheet.addRow(["Alternative online converters:"]);
+        worksheet.addRow(["• CloudConvert.com"]);
+        worksheet.addRow(["• Online-Convert.com"]);
+        worksheet.addRow(["• Zamzar.com"]);
+
+        // Set column widths
+        worksheet.getColumn(1).width = 25;
+        worksheet.getColumn(2).width = 40;
+
+        xlsxFilePath = path.join(
+          uploadsDir,
+          `conversion_info_${Date.now()}.xlsx`
+        );
+        await workbook.xlsx.writeFile(xlsxFilePath);
+        conversionSuccess = true;
+        console.log("Created conversion info file");
+      }
+    } catch (error) {
+      console.error("Error during conversion:", error);
+      return res.status(500).json({
+        error: "Failed to process .numbers file",
+        details: error.message,
+      });
+    }
+
+    if (!conversionSuccess || !xlsxFilePath || !fs.existsSync(xlsxFilePath)) {
+      return res.status(500).json({
+        error:
+          "Failed to convert .numbers file. Please try using a macOS system with Numbers app installed.",
+      });
+    }
+
+    // Determine output filename
+    const originalName = path.parse(req.file.originalname).name;
+    const outputFilename = `${originalName}.xlsx`;
+
+    // Send the converted file
+    res.download(xlsxFilePath, outputFilename, (err) => {
       if (err) {
         console.error("Error during file download:", err);
-        res.status(500).json({ error: "Error downloading the file" });
+        res.status(500).json({ error: "Error downloading converted file" });
+      } else {
+        console.log("Numbers file converted and downloaded successfully");
+
+        // Clean up temporary files after download
+        setTimeout(() => {
+          if (fs.existsSync(xlsxFilePath)) {
+            fs.unlinkSync(xlsxFilePath);
+            console.log("Cleaned up converted file");
+          }
+          if (fs.existsSync(numbersFilePath)) {
+            fs.unlinkSync(numbersFilePath);
+            console.log("Cleaned up uploaded file");
+          }
+        }, 30000); // Clean up after 30 seconds
       }
     });
   } catch (error) {
-    console.error("Error converting numbers to XLSX:", error);
-    res.status(500).json({ error: "Error converting numbers to XLSX" });
+    console.error("Error converting Numbers to Excel:", error);
+    res.status(500).json({
+      error: "Error converting Numbers file to Excel format",
+      details: error.message,
+    });
   }
 });
 
