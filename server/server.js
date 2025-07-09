@@ -240,8 +240,8 @@ function parseTransactionLine(line, accountNumber) {
   // Parse amount
   const amount = parseFloat(amountStr) || 0.0;
 
-  // Format amounts (keeping the R prefix for consistency with your existing format)
-  const amountDot = `R${amount.toFixed(2)}`;
+  // Format amounts (without R prefix for clean CSV export)
+  const amountDot = amount.toFixed(2);
   const amountComma = amountDot.replace(".", ",");
 
   return {
@@ -410,8 +410,8 @@ app.get("/api/download/excel", async (req, res) => {
         yymmdd: tx.yymmdd || "N/A",
         isoDate: tx.isoDate || "N/A",
         displayDate: tx.displayDate || "N/A",
-        amountDot: tx.amountDot || "R0.00",
-        amountComma: tx.amountComma || "R0,00",
+        amountDot: tx.amountDot || "0.00",
+        amountComma: tx.amountComma || "0,00",
         cdIndicator: tx.cdIndicator || "C",
         description: tx.description || "",
       });
