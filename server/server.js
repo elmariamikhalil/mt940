@@ -33,16 +33,18 @@ const storage = multer.diskStorage({
   },
 });
 
-// File filter to accept .mt940, .sta, .fin, and .txt files
+// FIXED: File filter to accept .mt940, .sta, .fin, .txt, and .numbers files
 const fileFilter = (req, file, cb) => {
-  const allowedExtensions = [".mt940", ".sta", ".fin", ".txt"];
+  const allowedExtensions = [".mt940", ".sta", ".fin", ".txt", ".numbers"];
   const ext = path.extname(file.originalname).toLowerCase();
   if (allowedExtensions.includes(ext)) {
     cb(null, true);
   } else {
     cb(
       new Error(
-        "Invalid file type. Only .mt940, .sta, .fin, and .txt files are allowed."
+        `Invalid file type. Only ${allowedExtensions.join(
+          ", "
+        )} files are allowed.`
       ),
       false
     );
@@ -53,7 +55,7 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 50 * 1024 * 1024, // FIXED: Increased to 50MB for Numbers files
   },
 });
 
@@ -444,7 +446,7 @@ app.get("/api/download/excel", async (req, res) => {
   }
 });
 
-// Numbers to XLSX Conversion Endpoint
+// FIXED: Apple Numbers to Excel Conversion Endpoint
 app.post("/api/convert-numbers", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
@@ -453,40 +455,42 @@ app.post("/api/convert-numbers", upload.single("file"), async (req, res) => {
 
     const numbersFilePath = req.file.path;
     const fileExtension = path.extname(req.file.originalname).toLowerCase();
-    
+
     // Validate file extension
-    if (fileExtension !== '.numbers') {
-      return res.status(400).json({ 
-        error: "Invalid file format. Please upload a .numbers file from Apple Numbers." 
+    if (fileExtension !== ".numbers") {
+      return res.status(400).json({
+        error:
+          "Invalid file format. Please upload a .numbers file from Apple Numbers.",
       });
     }
 
     console.log("Processing Apple Numbers file:", req.file.originalname);
     console.log("File size:", req.file.size, "bytes");
     console.log("File path:", numbersFilePath);
-    
+
     let conversionSuccess = false;
     let xlsxFilePath = null;
     const originalName = path.parse(req.file.originalname).name;
-    
+
     // Method 1: Try AppleScript on macOS
-    if (process.platform === 'darwin') {
+    if (process.platform === "darwin") {
       try {
-        const tempDir = path.join(__dirname, 'Uploads', 'temp');
+        const tempDir = path.join(__dirname, "Uploads", "temp");
         if (!fs.existsSync(tempDir)) {
           fs.mkdirSync(tempDir, { recursive: true });
         }
-        
+
         const outputPath = path.join(tempDir, `${originalName}.xlsx`);
-        
+
         // Check if Numbers app is available
         console.log("Checking for Numbers app...");
-        const { execSync } = require('child_process');
-        
+
         try {
-          execSync('osascript -e "tell application \\"Numbers\\" to version"', { timeout: 5000 });
+          execSync('osascript -e "tell application \\"Numbers\\" to version"', {
+            timeout: 5000,
+          });
           console.log("Numbers app found, attempting conversion...");
-          
+
           // Use AppleScript to convert
           const appleScript = `
             tell application "Numbers"
@@ -495,181 +499,206 @@ app.post("/api/convert-numbers", upload.single("file"), async (req, res) => {
               close theDoc
             end tell
           `;
-          
+
           execSync(`osascript -e '${appleScript}'`, { timeout: 60000 });
-          
+
           if (fs.existsSync(outputPath)) {
             xlsxFilePath = outputPath;
             conversionSuccess = true;
             console.log("✅ Successfully converted using AppleScript");
           }
         } catch (numbersAppError) {
-          console.log("❌ Numbers app not available or failed:", numbersAppError.message);
+          console.log(
+            "❌ Numbers app not available or failed:",
+            numbersAppError.message
+          );
         }
       } catch (appleScriptError) {
-        console.log("❌ AppleScript conversion failed:", appleScriptError.message);
+        console.log(
+          "❌ AppleScript conversion failed:",
+          appleScriptError.message
+        );
       }
     } else {
       console.log("Not running on macOS, skipping AppleScript method");
     }
-    
+
     // Method 2: Try extracting data from Numbers ZIP structure
     if (!conversionSuccess) {
       try {
         console.log("Attempting ZIP extraction method...");
-        
-        // Install adm-zip if not already installed
-        const AdmZip = require('adm-zip');
-        
+
+        // FIXED: Try to load adm-zip, handle if not installed
+        let AdmZip;
+        try {
+          AdmZip = require("adm-zip");
+        } catch (admZipError) {
+          console.log("❌ adm-zip not installed, skipping ZIP method");
+          throw new Error("adm-zip dependency not installed");
+        }
+
         // Numbers files are actually ZIP archives
         const zip = new AdmZip(numbersFilePath);
         const entries = zip.getEntries();
-        
+
         console.log(`Found ${entries.length} entries in Numbers file`);
-        
+
         // Create basic workbook
         const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Conversion Info');
-        
+        const worksheet = workbook.addWorksheet("Conversion Info");
+
         // Add header explaining the extraction
-        worksheet.mergeCells('A1:C1');
-        worksheet.getCell('A1').value = 'Apple Numbers File Analysis';
-        worksheet.getCell('A1').font = { bold: true, size: 16 };
-        worksheet.getCell('A1').alignment = { horizontal: 'center' };
-        worksheet.getCell('A1').fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FF4472C4' }
+        worksheet.mergeCells("A1:C1");
+        worksheet.getCell("A1").value = "Apple Numbers File Analysis";
+        worksheet.getCell("A1").font = { bold: true, size: 16 };
+        worksheet.getCell("A1").alignment = { horizontal: "center" };
+        worksheet.getCell("A1").fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF4472C4" },
         };
-        worksheet.getCell('A1').font.color = { argb: 'FFFFFFFF' };
-        
-        worksheet.addRow(['']);
-        worksheet.addRow(['File Information:']);
-        worksheet.addRow(['Original File:', req.file.originalname]);
-        worksheet.addRow(['File Size:', `${(req.file.size / 1024).toFixed(1)} KB`]);
-        worksheet.addRow(['Processing Date:', new Date().toLocaleString()]);
-        worksheet.addRow(['Server Platform:', process.platform]);
-        
-        worksheet.addRow(['']);
-        worksheet.addRow(['Conversion Status:', 'Requires Manual Conversion']);
-        
-        worksheet.addRow(['']);
-        worksheet.addRow(['Why automatic conversion is limited:']);
-        worksheet.addRow(['•', 'Numbers files use Apple\'s proprietary format']);
-        worksheet.addRow(['•', 'Full conversion requires Apple Numbers app']);
-        worksheet.addRow(['•', 'This server provides guidance for manual conversion']);
-        
-        worksheet.addRow(['']);
-        worksheet.addRow(['Manual Conversion Steps:']);
-        worksheet.addRow(['1.', 'Open your .numbers file in Apple Numbers']);
-        worksheet.addRow(['2.', 'Click File → Export To → Excel']);
-        worksheet.addRow(['3.', 'Choose "Excel" format (.xlsx)']);
-        worksheet.addRow(['4.', 'Click "Next" and save the file']);
-        
-        worksheet.addRow(['']);
-        worksheet.addRow(['Alternative Online Converters:']);
-        worksheet.addRow(['•', 'CloudConvert.com (supports .numbers → .xlsx)']);
-        worksheet.addRow(['•', 'Zamzar.com (online file converter)']);
-        worksheet.addRow(['•', 'Online-Convert.com (various formats)']);
-        
-        worksheet.addRow(['']);
-        worksheet.addRow(['File Structure Analysis:']);
-        worksheet.addRow(['Entries found:', entries.length.toString()]);
-        
+        worksheet.getCell("A1").font.color = { argb: "FFFFFFFF" };
+
+        worksheet.addRow([""]);
+        worksheet.addRow(["File Information:"]);
+        worksheet.addRow(["Original File:", req.file.originalname]);
+        worksheet.addRow([
+          "File Size:",
+          `${(req.file.size / 1024).toFixed(1)} KB`,
+        ]);
+        worksheet.addRow(["Processing Date:", new Date().toLocaleString()]);
+        worksheet.addRow(["Server Platform:", process.platform]);
+
+        worksheet.addRow([""]);
+        worksheet.addRow(["Conversion Status:", "Requires Manual Conversion"]);
+
+        worksheet.addRow([""]);
+        worksheet.addRow(["Why automatic conversion is limited:"]);
+        worksheet.addRow(["•", "Numbers files use Apple's proprietary format"]);
+        worksheet.addRow(["•", "Full conversion requires Apple Numbers app"]);
+        worksheet.addRow([
+          "•",
+          "This server provides guidance for manual conversion",
+        ]);
+
+        worksheet.addRow([""]);
+        worksheet.addRow(["Manual Conversion Steps:"]);
+        worksheet.addRow(["1.", "Open your .numbers file in Apple Numbers"]);
+        worksheet.addRow(["2.", "Click File → Export To → Excel"]);
+        worksheet.addRow(["3.", 'Choose "Excel" format (.xlsx)']);
+        worksheet.addRow(["4.", 'Click "Next" and save the file']);
+
+        worksheet.addRow([""]);
+        worksheet.addRow(["Alternative Online Converters:"]);
+        worksheet.addRow(["•", "CloudConvert.com (supports .numbers → .xlsx)"]);
+        worksheet.addRow(["•", "Zamzar.com (online file converter)"]);
+        worksheet.addRow(["•", "Online-Convert.com (various formats)"]);
+
+        worksheet.addRow([""]);
+        worksheet.addRow(["File Structure Analysis:"]);
+        worksheet.addRow(["Entries found:", entries.length.toString()]);
+
         // List some key entries
         entries.slice(0, 10).forEach((entry, index) => {
           worksheet.addRow([`Entry ${index + 1}:`, entry.entryName]);
         });
-        
+
         if (entries.length > 10) {
-          worksheet.addRow(['...', `and ${entries.length - 10} more entries`]);
+          worksheet.addRow(["...", `and ${entries.length - 10} more entries`]);
         }
-        
+
         // Style the worksheet
         worksheet.getColumn(1).width = 5;
         worksheet.getColumn(2).width = 50;
         worksheet.getColumn(3).width = 20;
-        
+
         // Style headers
         worksheet.getRow(3).font = { bold: true };
         worksheet.getRow(9).font = { bold: true };
         worksheet.getRow(15).font = { bold: true };
         worksheet.getRow(21).font = { bold: true };
         worksheet.getRow(27).font = { bold: true };
-        
-        xlsxFilePath = path.join(__dirname, 'Uploads', `${originalName}_conversion_guide.xlsx`);
+
+        xlsxFilePath = path.join(
+          __dirname,
+          "Uploads",
+          `${originalName}_conversion_guide.xlsx`
+        );
         await workbook.xlsx.writeFile(xlsxFilePath);
         conversionSuccess = true;
-        
+
         console.log("✅ Created conversion guide with file analysis");
-        
       } catch (zipError) {
         console.log("❌ ZIP extraction failed:", zipError.message);
         console.log("Will create basic guidance file instead");
       }
     }
-    
+
     // Method 3: Create basic guidance file if all else fails
     if (!conversionSuccess) {
       try {
         console.log("Creating basic guidance file...");
-        
+
         const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Conversion Guide');
-        
-        worksheet.addRow(['Apple Numbers to Excel Converter']);
-        worksheet.addRow(['']);
-        worksheet.addRow(['Status:', 'Manual Conversion Required']);
-        worksheet.addRow(['File:', req.file.originalname]);
-        worksheet.addRow(['Size:', `${(req.file.size / 1024).toFixed(1)} KB`]);
-        worksheet.addRow(['']);
-        worksheet.addRow(['Instructions:']);
-        worksheet.addRow(['1. Open the .numbers file in Apple Numbers']);
-        worksheet.addRow(['2. Go to File → Export To → Excel']);
-        worksheet.addRow(['3. Choose .xlsx format']);
-        worksheet.addRow(['4. Save the converted file']);
-        
+        const worksheet = workbook.addWorksheet("Conversion Guide");
+
+        worksheet.addRow(["Apple Numbers to Excel Converter"]);
+        worksheet.addRow([""]);
+        worksheet.addRow(["Status:", "Manual Conversion Required"]);
+        worksheet.addRow(["File:", req.file.originalname]);
+        worksheet.addRow(["Size:", `${(req.file.size / 1024).toFixed(1)} KB`]);
+        worksheet.addRow([""]);
+        worksheet.addRow(["Instructions:"]);
+        worksheet.addRow(["1. Open the .numbers file in Apple Numbers"]);
+        worksheet.addRow(["2. Go to File → Export To → Excel"]);
+        worksheet.addRow(["3. Choose .xlsx format"]);
+        worksheet.addRow(["4. Save the converted file"]);
+
         worksheet.getRow(1).font = { bold: true, size: 14 };
         worksheet.getColumn(1).width = 25;
         worksheet.getColumn(2).width = 40;
-        
-        xlsxFilePath = path.join(__dirname, 'Uploads', `${originalName}_guide.xlsx`);
+
+        xlsxFilePath = path.join(
+          __dirname,
+          "Uploads",
+          `${originalName}_guide.xlsx`
+        );
         await workbook.xlsx.writeFile(xlsxFilePath);
         conversionSuccess = true;
-        
+
         console.log("✅ Created basic conversion guide");
-        
       } catch (guideError) {
         console.log("❌ Failed to create guidance file:", guideError.message);
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: "Failed to process file",
-          details: guideError.message 
+          details: guideError.message,
         });
       }
     }
-    
+
     // Final check and response
     if (!conversionSuccess || !xlsxFilePath || !fs.existsSync(xlsxFilePath)) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: "Unable to process .numbers file",
-        suggestion: "Please use Apple Numbers to export manually: File → Export To → Excel"
+        suggestion:
+          "Please use Apple Numbers to export manually: File → Export To → Excel",
       });
     }
-    
+
     // Send the file
     const outputFilename = `${originalName}.xlsx`;
     console.log("Sending file:", outputFilename);
-    
+
     res.download(xlsxFilePath, outputFilename, (err) => {
       if (err) {
         console.error("❌ Error during file download:", err);
         res.status(500).json({ error: "Error downloading converted file" });
       } else {
         console.log("✅ File sent successfully:", outputFilename);
-        
+
         // Clean up files after 30 seconds
         setTimeout(() => {
-          [xlsxFilePath, numbersFilePath].forEach(filePath => {
+          [xlsxFilePath, numbersFilePath].forEach((filePath) => {
             if (fs.existsSync(filePath)) {
               fs.unlinkSync(filePath);
               console.log("🧹 Cleaned up:", path.basename(filePath));
@@ -678,23 +707,23 @@ app.post("/api/convert-numbers", upload.single("file"), async (req, res) => {
         }, 30000);
       }
     });
-    
   } catch (error) {
     console.error("❌ Error in Numbers conversion:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Error processing Numbers file",
       details: error.message,
-      suggestion: "Try converting manually in Apple Numbers app"
+      suggestion: "Try converting manually in Apple Numbers app",
     });
   }
 });
+
 // Error handling middleware
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === "LIMIT_FILE_SIZE") {
       return res
         .status(400)
-        .json({ error: "File too large. Maximum size is 10MB." });
+        .json({ error: "File too large. Maximum size is 50MB." });
     }
   }
 
