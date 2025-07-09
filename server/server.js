@@ -1,4 +1,3 @@
-const express = require("express");
 const bodyParser = require("body-parser");
 const path = require("path");
 const cors = require("cors");
@@ -462,7 +461,7 @@ app.get("/api/download/excel", async (req, res) => {
   }
 });
 
-// Enhanced Numbers to Excel conversion endpoint - PRIVACY FOCUSED
+// Enhanced Numbers to Excel conversion with actual data extraction
 app.post("/api/convert-numbers", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
@@ -473,7 +472,6 @@ app.post("/api/convert-numbers", upload.single("file"), async (req, res) => {
     const fileExtension = path.extname(req.file.originalname).toLowerCase();
     const originalName = path.parse(req.file.originalname).name;
 
-    // Validate file extension
     if (fileExtension !== ".numbers") {
       return res.status(400).json({
         error:
@@ -481,22 +479,28 @@ app.post("/api/convert-numbers", upload.single("file"), async (req, res) => {
       });
     }
 
-    console.log("🔒 Processing Numbers file locally:", req.file.originalname);
+    console.log(
+      "🔄 Converting Numbers file with data extraction:",
+      req.file.originalname
+    );
     console.log("File size:", req.file.size, "bytes");
 
-    // Try multiple local conversion strategies
-    let conversionResult = await convertNumbersLocally(
+    // Enhanced conversion with multiple strategies
+    let conversionResult = await convertNumbersWithDataExtraction(
       numbersFilePath,
       originalName
     );
 
     if (conversionResult.success) {
+      console.log(`✅ Successfully converted: ${conversionResult.method}`);
+
       // Send the converted file
       res.download(conversionResult.filePath, `${originalName}.xlsx`, (err) => {
         if (err) {
           console.error("Error downloading file:", err);
           res.status(500).json({ error: "Error downloading converted file" });
         } else {
+          console.log("📁 File downloaded successfully");
           // Clean up files after successful download
           setTimeout(() => {
             cleanupFiles([conversionResult.filePath, numbersFilePath]);
@@ -504,19 +508,17 @@ app.post("/api/convert-numbers", upload.single("file"), async (req, res) => {
         }
       });
     } else {
-      // Return guidance for manual conversion
-      res.status(422).json({
-        error: "Numbers file requires manual conversion",
-        message: conversionResult.message,
-        guidance: conversionResult.guidance,
-        suggestedSteps: conversionResult.steps,
-        privacy: conversionResult.privacy || "All processing done locally",
+      console.log("❌ Conversion failed:", conversionResult.error);
+      res.status(500).json({
+        error: "Failed to convert Numbers file",
+        details: conversionResult.error,
+        extractedData: conversionResult.extractedData || null,
       });
     }
   } catch (error) {
-    console.error("Error in local Numbers conversion:", error);
+    console.error("Error in Numbers conversion:", error);
     res.status(500).json({
-      error: "Error processing Numbers file locally",
+      error: "Error processing Numbers file",
       details: error.message,
     });
   }
