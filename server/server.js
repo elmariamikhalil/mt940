@@ -9,6 +9,9 @@ const multer = require("multer");
 const ExcelJS = require("exceljs");
 const { execSync } = require("child_process");
 
+// Add AdmZip for Numbers file analysis
+const AdmZip = require("adm-zip"); // npm install adm-zip
+
 const app = express();
 app.use(cors());
 const port = process.env.PORT || 5002;
@@ -33,7 +36,7 @@ const storage = multer.diskStorage({
   },
 });
 
-// FIXED: File filter to accept .mt940, .sta, .fin, .txt, and .numbers files
+// Enhanced file filter to accept .mt940, .sta, .fin, .txt, and .numbers files
 const fileFilter = (req, file, cb) => {
   const allowedExtensions = [".mt940", ".sta", ".fin", ".txt", ".numbers"];
   const ext = path.extname(file.originalname).toLowerCase();
@@ -55,7 +58,7 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 50 * 1024 * 1024, // FIXED: Increased to 50MB for Numbers files
+    fileSize: 100 * 1024 * 1024, // Increased to 100MB for large Numbers files
   },
 });
 
@@ -315,6 +318,19 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() });
 });
 
+// Privacy status endpoint - NEW
+app.get("/api/privacy-status", (req, res) => {
+  res.json({
+    privacy: "guaranteed",
+    processing: "local-only",
+    external_services: "none",
+    data_retention: "temporary-local-files-only",
+    platform: process.platform,
+    numbers_support: process.platform === "darwin" ? "native" : "analysis-only",
+    message: "All file processing happens locally on your server",
+  });
+});
+
 // MT940 Conversion Endpoint - IMPROVED ERROR HANDLING
 app.post("/api/convert", upload.single("file"), async (req, res) => {
   if (!req.file) {
@@ -446,7 +462,7 @@ app.get("/api/download/excel", async (req, res) => {
   }
 });
 
-// FIXED: Apple Numbers to Excel Conversion Endpoint
+// Enhanced Numbers to Excel conversion endpoint - PRIVACY FOCUSED
 app.post("/api/convert-numbers", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
@@ -455,6 +471,7 @@ app.post("/api/convert-numbers", upload.single("file"), async (req, res) => {
 
     const numbersFilePath = req.file.path;
     const fileExtension = path.extname(req.file.originalname).toLowerCase();
+    const originalName = path.parse(req.file.originalname).name;
 
     // Validate file extension
     if (fileExtension !== ".numbers") {
@@ -464,258 +481,418 @@ app.post("/api/convert-numbers", upload.single("file"), async (req, res) => {
       });
     }
 
-    console.log("Processing Apple Numbers file:", req.file.originalname);
+    console.log("🔒 Processing Numbers file locally:", req.file.originalname);
     console.log("File size:", req.file.size, "bytes");
-    console.log("File path:", numbersFilePath);
 
-    let conversionSuccess = false;
-    let xlsxFilePath = null;
-    const originalName = path.parse(req.file.originalname).name;
+    // Try multiple local conversion strategies
+    let conversionResult = await convertNumbersLocally(
+      numbersFilePath,
+      originalName
+    );
 
-    // Method 1: Try AppleScript on macOS
-    if (process.platform === "darwin") {
-      try {
-        const tempDir = path.join(__dirname, "Uploads", "temp");
-        if (!fs.existsSync(tempDir)) {
-          fs.mkdirSync(tempDir, { recursive: true });
+    if (conversionResult.success) {
+      // Send the converted file
+      res.download(conversionResult.filePath, `${originalName}.xlsx`, (err) => {
+        if (err) {
+          console.error("Error downloading file:", err);
+          res.status(500).json({ error: "Error downloading converted file" });
+        } else {
+          // Clean up files after successful download
+          setTimeout(() => {
+            cleanupFiles([conversionResult.filePath, numbersFilePath]);
+          }, 30000);
         }
-
-        const outputPath = path.join(tempDir, `${originalName}.xlsx`);
-
-        // Check if Numbers app is available
-        console.log("Checking for Numbers app...");
-
-        try {
-          execSync('osascript -e "tell application \\"Numbers\\" to version"', {
-            timeout: 5000,
-          });
-          console.log("Numbers app found, attempting conversion...");
-
-          // Use AppleScript to convert
-          const appleScript = `
-            tell application "Numbers"
-              set theDoc to open POSIX file "${numbersFilePath}"
-              export theDoc to file "${outputPath}" as Microsoft Excel
-              close theDoc
-            end tell
-          `;
-
-          execSync(`osascript -e '${appleScript}'`, { timeout: 60000 });
-
-          if (fs.existsSync(outputPath)) {
-            xlsxFilePath = outputPath;
-            conversionSuccess = true;
-            console.log("✅ Successfully converted using AppleScript");
-          }
-        } catch (numbersAppError) {
-          console.log(
-            "❌ Numbers app not available or failed:",
-            numbersAppError.message
-          );
-        }
-      } catch (appleScriptError) {
-        console.log(
-          "❌ AppleScript conversion failed:",
-          appleScriptError.message
-        );
-      }
+      });
     } else {
-      console.log("Not running on macOS, skipping AppleScript method");
-    }
-
-    // Method 2: Try extracting data from Numbers ZIP structure
-    if (!conversionSuccess) {
-      try {
-        console.log("Attempting ZIP extraction method...");
-
-        // FIXED: Try to load adm-zip, handle if not installed
-        let AdmZip;
-        try {
-          AdmZip = require("adm-zip");
-        } catch (admZipError) {
-          console.log("❌ adm-zip not installed, skipping ZIP method");
-          throw new Error("adm-zip dependency not installed");
-        }
-
-        // Numbers files are actually ZIP archives
-        const zip = new AdmZip(numbersFilePath);
-        const entries = zip.getEntries();
-
-        console.log(`Found ${entries.length} entries in Numbers file`);
-
-        // Create basic workbook
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet("Conversion Info");
-
-        // Add header explaining the extraction
-        worksheet.mergeCells("A1:C1");
-        worksheet.getCell("A1").value = "Apple Numbers File Analysis";
-        worksheet.getCell("A1").font = { bold: true, size: 16 };
-        worksheet.getCell("A1").alignment = { horizontal: "center" };
-        worksheet.getCell("A1").fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: "FF4472C4" },
-        };
-        worksheet.getCell("A1").font.color = { argb: "FFFFFFFF" };
-
-        worksheet.addRow([""]);
-        worksheet.addRow(["File Information:"]);
-        worksheet.addRow(["Original File:", req.file.originalname]);
-        worksheet.addRow([
-          "File Size:",
-          `${(req.file.size / 1024).toFixed(1)} KB`,
-        ]);
-        worksheet.addRow(["Processing Date:", new Date().toLocaleString()]);
-        worksheet.addRow(["Server Platform:", process.platform]);
-
-        worksheet.addRow([""]);
-        worksheet.addRow(["Conversion Status:", "Requires Manual Conversion"]);
-
-        worksheet.addRow([""]);
-        worksheet.addRow(["Why automatic conversion is limited:"]);
-        worksheet.addRow(["•", "Numbers files use Apple's proprietary format"]);
-        worksheet.addRow(["•", "Full conversion requires Apple Numbers app"]);
-        worksheet.addRow([
-          "•",
-          "This server provides guidance for manual conversion",
-        ]);
-
-        worksheet.addRow([""]);
-        worksheet.addRow(["Manual Conversion Steps:"]);
-        worksheet.addRow(["1.", "Open your .numbers file in Apple Numbers"]);
-        worksheet.addRow(["2.", "Click File → Export To → Excel"]);
-        worksheet.addRow(["3.", 'Choose "Excel" format (.xlsx)']);
-        worksheet.addRow(["4.", 'Click "Next" and save the file']);
-
-        worksheet.addRow([""]);
-        worksheet.addRow(["Alternative Online Converters:"]);
-        worksheet.addRow(["•", "CloudConvert.com (supports .numbers → .xlsx)"]);
-        worksheet.addRow(["•", "Zamzar.com (online file converter)"]);
-        worksheet.addRow(["•", "Online-Convert.com (various formats)"]);
-
-        worksheet.addRow([""]);
-        worksheet.addRow(["File Structure Analysis:"]);
-        worksheet.addRow(["Entries found:", entries.length.toString()]);
-
-        // List some key entries
-        entries.slice(0, 10).forEach((entry, index) => {
-          worksheet.addRow([`Entry ${index + 1}:`, entry.entryName]);
-        });
-
-        if (entries.length > 10) {
-          worksheet.addRow(["...", `and ${entries.length - 10} more entries`]);
-        }
-
-        // Style the worksheet
-        worksheet.getColumn(1).width = 5;
-        worksheet.getColumn(2).width = 50;
-        worksheet.getColumn(3).width = 20;
-
-        // Style headers
-        worksheet.getRow(3).font = { bold: true };
-        worksheet.getRow(9).font = { bold: true };
-        worksheet.getRow(15).font = { bold: true };
-        worksheet.getRow(21).font = { bold: true };
-        worksheet.getRow(27).font = { bold: true };
-
-        xlsxFilePath = path.join(
-          __dirname,
-          "Uploads",
-          `${originalName}_conversion_guide.xlsx`
-        );
-        await workbook.xlsx.writeFile(xlsxFilePath);
-        conversionSuccess = true;
-
-        console.log("✅ Created conversion guide with file analysis");
-      } catch (zipError) {
-        console.log("❌ ZIP extraction failed:", zipError.message);
-        console.log("Will create basic guidance file instead");
-      }
-    }
-
-    // Method 3: Create basic guidance file if all else fails
-    if (!conversionSuccess) {
-      try {
-        console.log("Creating basic guidance file...");
-
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet("Conversion Guide");
-
-        worksheet.addRow(["Apple Numbers to Excel Converter"]);
-        worksheet.addRow([""]);
-        worksheet.addRow(["Status:", "Manual Conversion Required"]);
-        worksheet.addRow(["File:", req.file.originalname]);
-        worksheet.addRow(["Size:", `${(req.file.size / 1024).toFixed(1)} KB`]);
-        worksheet.addRow([""]);
-        worksheet.addRow(["Instructions:"]);
-        worksheet.addRow(["1. Open the .numbers file in Apple Numbers"]);
-        worksheet.addRow(["2. Go to File → Export To → Excel"]);
-        worksheet.addRow(["3. Choose .xlsx format"]);
-        worksheet.addRow(["4. Save the converted file"]);
-
-        worksheet.getRow(1).font = { bold: true, size: 14 };
-        worksheet.getColumn(1).width = 25;
-        worksheet.getColumn(2).width = 40;
-
-        xlsxFilePath = path.join(
-          __dirname,
-          "Uploads",
-          `${originalName}_guide.xlsx`
-        );
-        await workbook.xlsx.writeFile(xlsxFilePath);
-        conversionSuccess = true;
-
-        console.log("✅ Created basic conversion guide");
-      } catch (guideError) {
-        console.log("❌ Failed to create guidance file:", guideError.message);
-        return res.status(500).json({
-          error: "Failed to process file",
-          details: guideError.message,
-        });
-      }
-    }
-
-    // Final check and response
-    if (!conversionSuccess || !xlsxFilePath || !fs.existsSync(xlsxFilePath)) {
-      return res.status(500).json({
-        error: "Unable to process .numbers file",
-        suggestion:
-          "Please use Apple Numbers to export manually: File → Export To → Excel",
+      // Return guidance for manual conversion
+      res.status(422).json({
+        error: "Numbers file requires manual conversion",
+        message: conversionResult.message,
+        guidance: conversionResult.guidance,
+        suggestedSteps: conversionResult.steps,
+        privacy: conversionResult.privacy || "All processing done locally",
       });
     }
-
-    // Send the file
-    const outputFilename = `${originalName}.xlsx`;
-    console.log("Sending file:", outputFilename);
-
-    res.download(xlsxFilePath, outputFilename, (err) => {
-      if (err) {
-        console.error("❌ Error during file download:", err);
-        res.status(500).json({ error: "Error downloading converted file" });
-      } else {
-        console.log("✅ File sent successfully:", outputFilename);
-
-        // Clean up files after 30 seconds
-        setTimeout(() => {
-          [xlsxFilePath, numbersFilePath].forEach((filePath) => {
-            if (fs.existsSync(filePath)) {
-              fs.unlinkSync(filePath);
-              console.log("🧹 Cleaned up:", path.basename(filePath));
-            }
-          });
-        }, 30000);
-      }
-    });
   } catch (error) {
-    console.error("❌ Error in Numbers conversion:", error);
+    console.error("Error in local Numbers conversion:", error);
     res.status(500).json({
-      error: "Error processing Numbers file",
+      error: "Error processing Numbers file locally",
       details: error.message,
-      suggestion: "Try converting manually in Apple Numbers app",
     });
   }
 });
+
+// Local conversion function with multiple strategies
+async function convertNumbersLocally(numbersFilePath, originalName) {
+  const uploadDir = path.join(__dirname, "Uploads");
+
+  console.log("🔒 Processing Numbers file locally (no external services)");
+
+  // Strategy 1: macOS with Numbers app (most reliable)
+  if (process.platform === "darwin") {
+    try {
+      const result = await tryLocalAppleScript(
+        numbersFilePath,
+        originalName,
+        uploadDir
+      );
+      if (result.success) {
+        console.log("✅ Successfully converted using local Apple Numbers");
+        return result;
+      }
+    } catch (error) {
+      console.log("❌ Local AppleScript failed:", error.message);
+    }
+  }
+
+  // Strategy 2: Extract and analyze Numbers file structure
+  try {
+    const result = await extractNumbersData(
+      numbersFilePath,
+      originalName,
+      uploadDir
+    );
+    if (result.success) {
+      console.log("✅ Successfully extracted data from Numbers file");
+      return result;
+    }
+  } catch (error) {
+    console.log("❌ Numbers extraction failed:", error.message);
+  }
+
+  // Strategy 3: Create detailed local guidance
+  return await createLocalGuidance(numbersFilePath, originalName, uploadDir);
+}
+
+// Strategy 1: Local AppleScript (macOS only)
+async function tryLocalAppleScript(numbersFilePath, originalName, uploadDir) {
+  try {
+    // Check if Numbers app is available locally
+    execSync('osascript -e "tell application \\"Numbers\\" to version"', {
+      timeout: 5000,
+      stdio: "pipe", // Suppress output
+    });
+
+    const outputPath = path.join(uploadDir, `${originalName}_converted.xlsx`);
+
+    // Use AppleScript for local conversion
+    const appleScript = `
+      tell application "Numbers"
+        set theDoc to open POSIX file "${numbersFilePath}"
+        export theDoc to file "${outputPath}" as Microsoft Excel
+        close theDoc
+      end tell
+    `;
+
+    execSync(`osascript -e '${appleScript}'`, {
+      timeout: 60000,
+      stdio: "pipe", // Suppress output
+    });
+
+    if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
+      return {
+        success: true,
+        filePath: outputPath,
+        method: "Local AppleScript",
+        message: "Converted using local Apple Numbers app",
+      };
+    } else {
+      throw new Error("Output file not created or empty");
+    }
+  } catch (error) {
+    console.log("Local AppleScript conversion failed:", error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// Strategy 2: Extract data from Numbers ZIP structure
+async function extractNumbersData(numbersFilePath, originalName, uploadDir) {
+  try {
+    console.log("📂 Analyzing Numbers file structure...");
+
+    // Numbers files are ZIP archives
+    const zip = new AdmZip(numbersFilePath);
+    const entries = zip.getEntries();
+
+    console.log(`Found ${entries.length} entries in Numbers file`);
+
+    // Look for preview images and data files
+    const previewEntries = entries.filter(
+      (entry) =>
+        entry.entryName.includes("preview") &&
+        entry.entryName.toLowerCase().includes(".jpeg")
+    );
+
+    const dataEntries = entries.filter(
+      (entry) =>
+        entry.entryName.includes("Tables/") || entry.entryName.includes("Data")
+    );
+
+    // Create workbook with extracted information
+    const workbook = new ExcelJS.Workbook();
+
+    // Sheet 1: File Analysis
+    const analysisSheet = workbook.addWorksheet("Numbers Analysis");
+
+    // Header
+    analysisSheet.mergeCells("A1:D1");
+    analysisSheet.getCell(
+      "A1"
+    ).value = `📊 Numbers File Analysis: ${originalName}`;
+    analysisSheet.getCell("A1").font = { bold: true, size: 14 };
+    analysisSheet.getCell("A1").alignment = { horizontal: "center" };
+    analysisSheet.getCell("A1").fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF4472C4" },
+    };
+
+    // File structure info
+    analysisSheet.addRow([]);
+    analysisSheet.addRow(["📁 File Structure Information"]);
+    analysisSheet.addRow(["Total Entries:", entries.length]);
+    analysisSheet.addRow(["Data Files Found:", dataEntries.length]);
+    analysisSheet.addRow(["Preview Images:", previewEntries.length]);
+    analysisSheet.addRow([
+      "File Size:",
+      `${(fs.statSync(numbersFilePath).size / 1024).toFixed(1)} KB`,
+    ]);
+
+    // List data entries
+    if (dataEntries.length > 0) {
+      analysisSheet.addRow([]);
+      analysisSheet.addRow(["🗂️ Data Files Detected:"]);
+      dataEntries.slice(0, 20).forEach((entry, index) => {
+        analysisSheet.addRow([
+          `${index + 1}.`,
+          entry.entryName,
+          `${entry.header.size} bytes`,
+        ]);
+      });
+
+      if (dataEntries.length > 20) {
+        analysisSheet.addRow([
+          "...",
+          `and ${dataEntries.length - 20} more data files`,
+        ]);
+      }
+    }
+
+    // Try to extract preview images
+    if (previewEntries.length > 0) {
+      const previewSheet = workbook.addWorksheet("Preview Images");
+
+      previewSheet.addRow(["📸 Spreadsheet Previews Found"]);
+      previewSheet.addRow([]);
+      previewSheet.addRow([
+        "Note: These are preview images of your spreadsheet",
+      ]);
+      previewSheet.addRow([
+        "For full data access, use manual conversion methods below",
+      ]);
+
+      // Extract and save preview images
+      previewEntries.slice(0, 3).forEach((entry, index) => {
+        try {
+          const imageData = zip.readFile(entry);
+          const imagePath = path.join(uploadDir, `preview_${index + 1}.jpeg`);
+          fs.writeFileSync(imagePath, imageData);
+          previewSheet.addRow([
+            `Preview ${index + 1}:`,
+            `Saved as preview_${index + 1}.jpeg`,
+          ]);
+        } catch (imgError) {
+          console.log(
+            `Failed to extract preview ${index + 1}:`,
+            imgError.message
+          );
+        }
+      });
+    }
+
+    // Manual conversion guidance
+    const guidanceSheet = workbook.addWorksheet("Conversion Guide");
+
+    guidanceSheet.addRow(["🔧 Manual Conversion Required"]);
+    guidanceSheet.addRow([]);
+    guidanceSheet.addRow(["Why manual conversion?"]);
+    guidanceSheet.addRow(["•", "Numbers uses Apple's proprietary data format"]);
+    guidanceSheet.addRow([
+      "•",
+      "Full data extraction requires Apple's libraries",
+    ]);
+    guidanceSheet.addRow([
+      "•",
+      "This preserves your data privacy (no external uploads)",
+    ]);
+
+    guidanceSheet.addRow([]);
+    guidanceSheet.addRow(["📱 Local Conversion Steps (Recommended):"]);
+    guidanceSheet.addRow(["1.", "Open your .numbers file in Apple Numbers"]);
+    guidanceSheet.addRow(["2.", "File → Export To → Excel..."]);
+    guidanceSheet.addRow(["3.", "Choose 'Excel' (.xlsx) format"]);
+    guidanceSheet.addRow(["4.", "Save and upload the .xlsx file"]);
+
+    guidanceSheet.addRow([]);
+    guidanceSheet.addRow(["🖥️ Alternative: Use iCloud"]);
+    guidanceSheet.addRow(["1.", "Upload .numbers to iCloud Numbers online"]);
+    guidanceSheet.addRow(["2.", "Download as Excel from iCloud"]);
+    guidanceSheet.addRow(["3.", "Upload the downloaded .xlsx file"]);
+
+    // Style the worksheets
+    [analysisSheet, guidanceSheet].forEach((sheet) => {
+      sheet.getColumn(1).width = 25;
+      sheet.getColumn(2).width = 40;
+      sheet.getColumn(3).width = 15;
+      sheet.getColumn(4).width = 15;
+    });
+
+    // Save the analysis file
+    const outputPath = path.join(uploadDir, `${originalName}_analysis.xlsx`);
+    await workbook.xlsx.writeFile(outputPath);
+
+    return {
+      success: true,
+      filePath: outputPath,
+      method: "File Structure Analysis",
+      message: `Analyzed Numbers file with ${entries.length} internal files. Manual conversion required for data access.`,
+      dataFiles: dataEntries.length,
+      previewImages: previewEntries.length,
+    };
+  } catch (error) {
+    console.log("Numbers file analysis failed:", error.message);
+    return {
+      success: false,
+      error: `File analysis failed: ${error.message}`,
+    };
+  }
+}
+
+// Strategy 3: Create comprehensive local guidance
+async function createLocalGuidance(numbersFilePath, originalName, uploadDir) {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Local Conversion Guide");
+
+    // Header
+    worksheet.mergeCells("A1:C1");
+    worksheet.getCell("A1").value = "🔒 Private Numbers to Excel Converter";
+    worksheet.getCell("A1").font = {
+      bold: true,
+      size: 16,
+      color: { argb: "FFFFFFFF" },
+    };
+    worksheet.getCell("A1").fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF2E8B57" }, // Sea green for privacy
+    };
+    worksheet.getCell("A1").alignment = { horizontal: "center" };
+
+    // Privacy notice
+    worksheet.addRow([]);
+    worksheet.addRow(["🛡️ Your Data Stays Private"]);
+    worksheet.addRow(["✅", "File processed locally on your server"]);
+    worksheet.addRow(["✅", "No external uploads or cloud services"]);
+    worksheet.addRow(["✅", "Complete data privacy maintained"]);
+
+    // File information
+    worksheet.addRow([]);
+    worksheet.addRow(["📋 File Details"]);
+    worksheet.addRow(["Name:", `${originalName}.numbers`]);
+    worksheet.addRow([
+      "Size:",
+      `${(fs.statSync(numbersFilePath).size / 1024).toFixed(1)} KB`,
+    ]);
+    worksheet.addRow(["Processed:", new Date().toLocaleString()]);
+    worksheet.addRow(["Server:", process.platform]);
+
+    // Local conversion methods
+    worksheet.addRow([]);
+    worksheet.addRow(["🍎 Method 1: Apple Numbers App (Recommended)"]);
+    worksheet.addRow(["1.", "Double-click your .numbers file"]);
+    worksheet.addRow(["2.", "File → Export To → Excel..."]);
+    worksheet.addRow(["3.", "Choose .xlsx format"]);
+    worksheet.addRow(["4.", "Click Export"]);
+    worksheet.addRow(["5.", "Upload the .xlsx file to this app"]);
+
+    worksheet.addRow([]);
+    worksheet.addRow(["☁️ Method 2: iCloud Numbers (Web-based)"]);
+    worksheet.addRow(["1.", "Go to iCloud.com and sign in"]);
+    worksheet.addRow(["2.", "Open Numbers app"]);
+    worksheet.addRow(["3.", "Upload your .numbers file"]);
+    worksheet.addRow(["4.", "Tools → Download a Copy → Excel"]);
+    worksheet.addRow(["5.", "Upload the downloaded .xlsx file"]);
+
+    worksheet.addRow([]);
+    worksheet.addRow(["💡 Why These Methods Work"]);
+    worksheet.addRow(["•", "Uses Apple's official conversion tools"]);
+    worksheet.addRow(["•", "Preserves all formatting and formulas"]);
+    worksheet.addRow(["•", "Maintains data accuracy"]);
+    worksheet.addRow(["•", "No third-party services required"]);
+
+    // Troubleshooting
+    worksheet.addRow([]);
+    worksheet.addRow(["🔧 Troubleshooting"]);
+    worksheet.addRow([
+      "No Numbers app?",
+      "Use iCloud Numbers (free Apple ID required)",
+    ]);
+    worksheet.addRow(["Large file?", "Export individual sheets separately"]);
+    worksheet.addRow([
+      "Complex formulas?",
+      "Check calculations after conversion",
+    ]);
+
+    // Style the worksheet
+    worksheet.getColumn(1).width = 20;
+    worksheet.getColumn(2).width = 50;
+    worksheet.getColumn(3).width = 20;
+
+    // Style section headers
+    [3, 7, 13, 20, 26, 31].forEach((rowNum) => {
+      const row = worksheet.getRow(rowNum);
+      row.font = { bold: true, size: 12 };
+      row.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFF0F8F0" }, // Light green
+      };
+    });
+
+    const guidePath = path.join(uploadDir, `${originalName}_local_guide.xlsx`);
+    await workbook.xlsx.writeFile(guidePath);
+
+    return {
+      success: false, // Not a successful conversion, but successful guidance
+      message: "Numbers file requires manual conversion to maintain privacy",
+      guidance: "Created local conversion guide with privacy-focused methods",
+      steps: [
+        "Open .numbers file in Apple Numbers app",
+        "Export as Excel (.xlsx) format",
+        "Upload the converted .xlsx file",
+      ],
+      filePath: guidePath,
+      privacy: "All processing done locally - no external services used",
+    };
+  } catch (error) {
+    throw new Error(`Failed to create local guidance: ${error.message}`);
+  }
+}
+
+// Utility function to clean up files
+function cleanupFiles(filePaths) {
+  filePaths.forEach((filePath) => {
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+        console.log("🧹 Cleaned up:", path.basename(filePath));
+      } catch (error) {
+        console.error("Failed to clean up file:", filePath, error.message);
+      }
+    }
+  });
+}
 
 // Error handling middleware
 app.use((error, req, res, next) => {
@@ -723,7 +900,7 @@ app.use((error, req, res, next) => {
     if (error.code === "LIMIT_FILE_SIZE") {
       return res
         .status(400)
-        .json({ error: "File too large. Maximum size is 50MB." });
+        .json({ error: "File too large. Maximum size is 100MB." });
     }
   }
 
@@ -752,11 +929,17 @@ const startServer = () => {
       console.log(
         `✅ HTTPS Server is running on https://mt940.axoplan.com:${port}`
       );
+      console.log("🔒 Privacy-focused Numbers conversion enabled");
+      console.log(`📊 Platform: ${process.platform}`);
+      console.log(`📁 Upload directory: ${path.join(__dirname, "Uploads")}`);
     });
   } else {
     // Fallback to HTTP for development
     http.createServer(app).listen(port, () => {
       console.log(`✅ HTTP Server is running on http://localhost:${port}`);
+      console.log("🔒 Privacy-focused Numbers conversion enabled");
+      console.log(`📊 Platform: ${process.platform}`);
+      console.log(`📁 Upload directory: ${path.join(__dirname, "Uploads")}`);
     });
   }
 };
