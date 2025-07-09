@@ -1,161 +1,209 @@
 /**
- * MT940 to CSV/Excel Converter
- * Exactly matching the output format of masterbalance.nl
+ * MT940 to CSV/Excel Converter - FIXED VERSION
+ * Properly handles MT940 parsing with comprehensive field extraction
  */
 const fs = require("fs");
 const path = require("path");
 const ExcelJS = require("exceljs");
-const { Parser } = require("json2csv");
+
 let latestTransactions = []; // Store transactions for download
 
 /**
- * Clean account number to remove currency or other prefixes/suffixes
+ * Clean account number to extract IBAN properly
  */
 function cleanAccountNumber(accountNumber) {
   console.log("Raw account number:", accountNumber);
-  const parts = accountNumber.split(/\/|\s+|,|;|-|:/);
+
+  // Remove common prefixes and suffixes
+  let cleaned = accountNumber.trim();
+
+  // Split by common delimiters and look for IBAN pattern
+  const parts = cleaned.split(/[\/\s,;:\-]+/);
+
   for (let part of parts) {
-    if (/^[A-Z]{2}\d{2}/.test(part)) {
-      console.log("Cleaned IBAN found:", part);
-      return part.trim();
+    part = part.trim();
+    // Look for IBAN pattern (2 letters + 2 digits + up to 30 alphanumeric)
+    if (/^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$/i.test(part)) {
+      console.log("Found IBAN:", part.toUpperCase());
+      return part.toUpperCase();
     }
   }
-  const currencyRegex = /^(EUR|USD|GBP|CHF|JPY|AUD|CAD|NOK|SEK|DKK|NZD)/i;
-  const cleaned = accountNumber.replace(currencyRegex, "").trim();
-  if (/^[A-Z]{2}\d{2}/.test(cleaned)) {
-    console.log("Cleaned IBAN after removing currency code:", cleaned);
-    return cleaned;
+
+  // Remove currency codes from beginning and end
+  const currencyRegex = /^(EUR|USD|GBP|CHF|JPY|AUD|CAD|NOK|SEK|DKK|NZD|ZAR)/i;
+  cleaned = cleaned.replace(currencyRegex, "").trim();
+  cleaned = cleaned
+    .replace(/(EUR|USD|GBP|CHF|JPY|AUD|CAD|NOK|SEK|DKK|NZD|ZAR)$/i, "")
+    .trim();
+
+  // Check again after currency removal
+  if (/^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$/i.test(cleaned)) {
+    console.log("Found IBAN after currency removal:", cleaned.toUpperCase());
+    return cleaned.toUpperCase();
   }
-  const fallback = parts[parts.length - 1].trim();
-  console.log("No clear IBAN format found, using fallback:", fallback);
-  return fallback;
+
+  // Fallback to the longest alphanumeric part
+  const fallback = parts.reduce(
+    (longest, current) => (current.length > longest.length ? current : longest),
+    ""
+  );
+
+  console.log("Using fallback account number:", fallback);
+  return fallback.trim();
 }
 
 /**
- * Parse MT940 file content
+ * Parse MT940 file content with proper field handling
  */
 function parseMT940(content) {
   const transactions = [];
-  const lines = content.split("\n");
+  const lines = content.split(/\r?\n/); // Handle both Unix and Windows line endings
+
   let currentAccountNumber = "";
   let currentTransaction = null;
   let descriptionLines = [];
 
+  console.log(`Processing ${lines.length} lines`);
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
+
     if (line.startsWith(":25:")) {
-      const rawAccountNumber = line.substring(4);
+      // Account identification
+      const rawAccountNumber = line.substring(4).trim();
       currentAccountNumber = cleanAccountNumber(rawAccountNumber);
+      console.log("Set account number:", currentAccountNumber);
     } else if (line.startsWith(":61:")) {
+      // Statement line (transaction)
       if (currentTransaction) {
+        // Finalize previous transaction
         if (descriptionLines.length > 0) {
           currentTransaction.description = buildDescription(descriptionLines);
         }
         transactions.push(currentTransaction);
       }
-      // Pass descriptionLines to parseTransactionLine for amount fallback
-      currentTransaction = parseTransactionLine(
-        line,
-        currentAccountNumber,
-        descriptionLines
-      );
+
+      // Parse new transaction
+      currentTransaction = parseTransactionLine(line, currentAccountNumber);
       descriptionLines = [];
-    } else if (line.startsWith(":86:") && currentTransaction) {
-      descriptionLines.push(line.substring(4));
+      console.log("Parsed transaction:", currentTransaction);
+    } else if (line.startsWith(":86:")) {
+      // Transaction details/description
+      if (currentTransaction) {
+        descriptionLines.push(line.substring(4).trim());
+      }
     } else if (
       currentTransaction &&
       descriptionLines.length > 0 &&
-      !line.startsWith(":")
+      !line.startsWith(":") &&
+      line.length > 0
     ) {
+      // Continuation of description
       descriptionLines.push(line);
     }
   }
+
+  // Don't forget the last transaction
   if (currentTransaction) {
     if (descriptionLines.length > 0) {
       currentTransaction.description = buildDescription(descriptionLines);
     }
     transactions.push(currentTransaction);
   }
+
+  console.log(`Parsed ${transactions.length} transactions`);
   return transactions;
 }
 
 /**
- * Parse transaction line and extract all required data
+ * Parse transaction line (:61:) with comprehensive field extraction
  */
-function parseTransactionLine(line, accountNumber, descriptionLines) {
-  const txData = line.substring(4);
-  const yymmdd = txData.substring(0, 6); // e.g., 240530
-  const yearPrefix = yymmdd.startsWith("24") ? "20" : "19"; // Adjust based on year
-  const year = yearPrefix + yymmdd.substring(0, 2); // e.g., 2024
-  const month = yymmdd.substring(2, 4); // e.g., 05
-  const day = yymmdd.substring(4, 6); // e.g., 30
-  const isoDate = `${year}-${month}-${day}`; // e.g., 2024-05-30
-  const displayDate = `${day}-${month}-${year}`; // e.g., 30-05-2024
+function parseTransactionLine(line, accountNumber) {
+  const txData = line.substring(4).trim(); // Remove ":61:" prefix
+  console.log("Parsing transaction line:", txData);
 
-  let cdIndicator = "D";
+  // MT940 :61: format: YYMMDD[MMDD]DebitCreditIndicator[Currency]Amount[TransactionReference]
+  // Pattern: YYMMDD + optional MMDD + D/C + optional currency + amount + optional reference
+
+  // Extract date (first 6 characters - YYMMDD)
+  const yymmdd = txData.substring(0, 6);
+
+  // Determine year (assuming 20xx for years 00-30, 19xx for years 31-99)
+  const year = parseInt(yymmdd.substring(0, 2));
+  const fullYear = year <= 30 ? 2000 + year : 1900 + year;
+  const month = yymmdd.substring(2, 4);
+  const day = yymmdd.substring(4, 6);
+
+  // Create date objects
+  const isoDate = `${fullYear}-${month}-${day}`;
+  const displayDate = `${day}-${month}-${fullYear}`;
+
+  // Extract remaining data after date
+  let remainingData = txData.substring(6);
+
+  // Skip optional booking date (MMDD) if present
+  if (remainingData.length >= 4 && /^\d{4}/.test(remainingData)) {
+    remainingData = remainingData.substring(4);
+  }
+
+  // Extract credit/debit indicator (D or C)
+  let cdIndicator = "";
+  if (remainingData.length > 0 && /^[DC]/.test(remainingData)) {
+    cdIndicator = remainingData.charAt(0);
+    remainingData = remainingData.substring(1);
+  }
+
+  // Extract amount - more robust parsing
   let amountStr = "0.00";
 
-  // Find C/D indicator position
-  let cdPos = -1;
-  for (let j = 6; j < txData.length; j++) {
-    if (txData[j] === "C" || txData[j] === "D") {
-      cdPos = j;
-      break;
-    }
-  }
+  // Try different patterns for amount extraction
+  const amountPatterns = [
+    // Pattern 1: Direct amount after C/D indicator
+    /^([A-Z]{3})?(\d+[,.]?\d*)/,
+    // Pattern 2: Amount with currency code
+    /^([A-Z]{3})(\d+[,.]?\d*)/,
+    // Pattern 3: Just digits with optional decimal
+    /^(\d+[,.]?\d*)/,
+  ];
 
-  if (cdPos > 0) {
-    cdIndicator = txData[cdPos];
-    // Extract amount after C/D until a delimiter (N, space, or end)
-    let endPos = cdPos + 1;
-    while (
-      endPos < txData.length &&
-      txData[endPos] !== "N" &&
-      txData[endPos] !== " " &&
-      txData[endPos] !== "\r" &&
-      txData[endPos] !== "\n"
-    ) {
-      endPos++;
-    }
-    amountStr = txData.substring(cdPos + 1, endPos).trim();
-
-    // Handle comma as decimal separator and ensure valid number
-    if (amountStr.includes(",")) {
-      amountStr = amountStr.replace(",", ".");
-    }
-
-    // Validate the amount format
-    if (!amountStr.match(/^\d+\.?\d{0,2}$/)) {
-      amountStr = "0.00"; // Temporary fallback if :61: fails
-    }
-  }
-
-  // Fallback to description if :61: amount is invalid
-  if (amountStr === "0.00" && descriptionLines.length > 0) {
-    const description = descriptionLines.join(" ");
-    const amountMatch = description.match(/OCMT EUR([\d,.]+)/);
-    if (amountMatch && amountMatch[1]) {
-      amountStr = amountMatch[1].replace(",", ".");
-      // Validate the fallback amount
-      if (!amountStr.match(/^\d+\.?\d{0,2}$/)) {
-        amountStr = "0.00";
+  for (const pattern of amountPatterns) {
+    const match = remainingData.match(pattern);
+    if (match) {
+      // Extract amount part (skip currency if present)
+      amountStr = match[2] || match[1];
+      if (amountStr && /^\d/.test(amountStr)) {
+        break;
       }
     }
   }
 
+  // Clean and validate amount
+  amountStr = amountStr.replace(/[^\d.,]/g, ""); // Remove non-numeric chars except . and ,
+  amountStr = amountStr.replace(/,/g, "."); // Convert comma to dot for decimal
+
+  // Ensure valid decimal format
+  if (!/^\d+\.?\d*$/.test(amountStr)) {
+    console.warn("Invalid amount format, using 0.00:", amountStr);
+    amountStr = "0.00";
+  }
+
+  // Parse amount
   const amount = parseFloat(amountStr) || 0.0;
-  const amountDot = `R${amount.toFixed(2)}`; // e.g., R82.73
-  const amountComma = amountDot.replace(".", ","); // e.g., R82,73
+
+  // Format amounts
+  const amountDot = amount.toFixed(2);
+  const amountComma = amountDot.replace(".", ",");
 
   return {
-    accountNumber: accountNumber,
-    shortValueDate: yymmdd,
-    isoValueDate: isoDate,
+    accountNumber: accountNumber || "UNKNOWN",
+    yymmdd: yymmdd,
+    isoDate: isoDate,
     displayDate: displayDate,
     amountDot: amountDot,
     amountComma: amountComma,
-    cdIndicator: cdIndicator,
+    cdIndicator: cdIndicator || "C",
     description: "",
+    rawAmount: amount, // Store raw amount for processing
   };
 }
 
@@ -163,16 +211,18 @@ function parseTransactionLine(line, accountNumber, descriptionLines) {
  * Build a clean description from the structured data
  */
 function buildDescription(lines) {
+  if (!lines || lines.length === 0) return "";
+
   const fullText = lines.join(" ");
   return fullText
-    .replace(/\//g, " ") // Replace slashes with spaces as per MasterBalance.nl
-    .replace(/\s+/g, " ") // Normalize spaces
+    .replace(/\//g, " ") // Replace slashes with spaces
+    .replace(/\s+/g, " ") // Normalize multiple spaces
     .trim()
     .replace(/"/g, '""'); // Escape double quotes for CSV
 }
 
 /**
- * Format transactions as CSV in the exact format of masterbalance.nl
+ * Format transactions as CSV matching masterbalance.nl format
  */
 function formatMasterbalanceCSV(transactions) {
   const header =
@@ -193,8 +243,8 @@ function formatMasterbalanceCSV(transactions) {
     .map((tx) => {
       return [
         `"${tx.accountNumber}"`,
-        `"${tx.shortValueDate}"`,
-        `"${tx.isoValueDate}"`,
+        `"${tx.yymmdd}"`,
+        `"${tx.isoDate}"`,
         `"${tx.displayDate}"`,
         `"${tx.amountDot}"`,
         `"${tx.amountComma}"`,
@@ -207,65 +257,101 @@ function formatMasterbalanceCSV(transactions) {
   return header + rows;
 }
 
-// Handle conversion of the uploaded MT940 file
+/**
+ * Handle conversion of uploaded MT940 file
+ */
 exports.handleConvert = async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+
   try {
+    console.log("Processing file:", req.file.path);
     const fileContent = fs.readFileSync(req.file.path, { encoding: "utf8" });
+    console.log("File content length:", fileContent.length);
+
     const transactions = parseMT940(fileContent);
     latestTransactions = transactions;
-    const displayTransactions = transactions.map((tx) => ({
-      date: tx.displayDate.replace(/"/g, ""),
-      amount:
-        tx.cdIndicator === "D"
-          ? -parseFloat(tx.amountDot.replace("R", "").replace(",", "."))
-          : parseFloat(tx.amountDot.replace("R", "").replace(",", ".")),
-      description: tx.description,
-    }));
-    console.log("Parsed transactions for API:", displayTransactions);
-    res.json({ transactions: displayTransactions });
+
+    // Format transactions for API response
+    const displayTransactions = transactions.map((tx) => {
+      const amount = tx.cdIndicator === "D" ? -tx.rawAmount : tx.rawAmount;
+      return {
+        date: tx.displayDate.replace(/"/g, ""),
+        amount: amount,
+        description: tx.description || "",
+        cdIndicator: tx.cdIndicator,
+        accountNumber: tx.accountNumber,
+      };
+    });
+
+    console.log(`Successfully parsed ${transactions.length} transactions`);
+    res.json({
+      transactions: displayTransactions,
+      summary: {
+        totalTransactions: transactions.length,
+        accountNumber: transactions[0]?.accountNumber || "UNKNOWN",
+      },
+    });
   } catch (error) {
     console.error("Error parsing MT940 file:", error);
-    res.status(500).json({ error: "Error parsing MT940 file" });
+    res.status(500).json({
+      error: "Error parsing MT940 file",
+      details: error.message,
+    });
   }
 };
 
-// Handle download of transactions as an Excel file
+/**
+ * Handle download of transactions as Excel file
+ */
 exports.downloadExcel = async (req, res) => {
   if (latestTransactions.length === 0) {
-    return res
-      .status(400)
-      .json({ error: "No transactions available for download" });
+    return res.status(400).json({
+      error: "No transactions available for download",
+    });
   }
+
   try {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Transactions");
+
+    // Set column headers and widths
     worksheet.columns = [
-      { header: "Account", key: "accountNumber", width: 25 },
-      { header: "Date (YYMMDD)", key: "shortValueDate", width: 15 },
-      { header: "Date (ISO)", key: "isoValueDate", width: 15 },
-      { header: "Date", key: "displayDate", width: 15 },
-      { header: "Amount", key: "amountDot", width: 15 },
-      { header: "Amount (comma)", key: "amountComma", width: 15 },
-      { header: "D/C", key: "cdIndicator", width: 5 },
+      { header: "Account Number", key: "accountNumber", width: 25 },
+      { header: "Date (YYMMDD)", key: "yymmdd", width: 15 },
+      { header: "Date (ISO)", key: "isoDate", width: 15 },
+      { header: "Date (Display)", key: "displayDate", width: 15 },
+      { header: "Amount (Dot)", key: "amountDot", width: 15 },
+      { header: "Amount (Comma)", key: "amountComma", width: 15 },
+      { header: "C/D", key: "cdIndicator", width: 5 },
       { header: "Description", key: "description", width: 70 },
     ];
+
+    // Add transaction rows
     latestTransactions.forEach((tx) => {
-      const row = {
-        accountNumber: tx.accountNumber,
-        shortValueDate: tx.shortValueDate,
-        isoValueDate: tx.isoValueDate,
-        displayDate: tx.displayDate,
-        amountDot: tx.amountDot,
-        amountComma: tx.amountComma,
-        cdIndicator: tx.cdIndicator,
-        description: tx.description,
-      };
-      worksheet.addRow(row);
+      worksheet.addRow({
+        accountNumber: tx.accountNumber || "N/A",
+        yymmdd: tx.yymmdd || "N/A",
+        isoDate: tx.isoDate || "N/A",
+        displayDate: tx.displayDate || "N/A",
+        amountDot: tx.amountDot || "0.00",
+        amountComma: tx.amountComma || "0,00",
+        cdIndicator: tx.cdIndicator || "C",
+        description: tx.description || "",
+      });
     });
-    const filePath = path.join(__dirname, "..", "uploads", "statement.xlsx");
+
+    // Ensure uploads directory exists
+    const uploadsDir = path.join(__dirname, "..", "uploads");
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const filePath = path.join(uploadsDir, "transactions.xlsx");
     await workbook.xlsx.writeFile(filePath);
-    res.download(filePath, "statement.xlsx", (err) => {
+
+    res.download(filePath, "transactions.xlsx", (err) => {
       if (err) {
         console.error("Error during file download:", err);
         res.status(500).json({ error: "Error downloading the file" });
@@ -277,17 +363,23 @@ exports.downloadExcel = async (req, res) => {
   }
 };
 
-// Handle download of transactions as a CSV file
+/**
+ * Handle download of transactions as CSV file
+ */
 exports.downloadCSV = (req, res) => {
   if (latestTransactions.length === 0) {
-    return res
-      .status(400)
-      .json({ error: "No transactions available for download" });
+    return res.status(400).json({
+      error: "No transactions available for download",
+    });
   }
+
   try {
     const csv = formatMasterbalanceCSV(latestTransactions);
-    res.header("Content-Type", "text/csv");
-    res.attachment("transactions.csv");
+    res.header("Content-Type", "text/csv; charset=utf-8");
+    res.header(
+      "Content-Disposition",
+      'attachment; filename="transactions.csv"'
+    );
     res.send(csv);
   } catch (error) {
     console.error("Error generating CSV:", error);
